@@ -22,6 +22,10 @@
 *                         only print the final summary.
 *   --max-restarts <n>    Cap on auto-pressing START after a HALT
 *                         (default 500) -- see below.
+*   --trace-after <n>     Only turn on --trace once at least n cards have
+*                         been read (default 0, i.e. immediately) -- lets
+*                         you skip the noisy load-deck portion of a trace
+*                         and capture only the actual program execution.
 *
 * Multi-phase 1620 boot decks (like the IPL-V load deck) conventionally
 * HALT between phases and expect the operator to press START to
@@ -45,6 +49,8 @@ function parseArgs(argv) {
         memory: 40000,
         quiet: false,
         maxRestarts: 500,
+        traceAfter: 0,
+        traceDelay: 0,
         files: []
     };
 
@@ -68,6 +74,12 @@ function parseArgs(argv) {
             break;
         case "--max-restarts":
             opts.maxRestarts = Number(argv[++x]);
+            break;
+        case "--trace-after":
+            opts.traceAfter = Number(argv[++x]);
+            break;
+        case "--trace-delay":
+            opts.traceDelay = Number(argv[++x]);
             break;
         default:
             opts.files.push(arg);
@@ -146,7 +158,7 @@ async function main() {
     context.devices = {cardReader, typewriter, cardPunch};
 
     processor.powerUp();
-    processor.tracing = opts.trace;
+    processor.tracing = opts.trace && opts.traceAfter <= 0 && opts.traceDelay <= 0;
     for (const sw of opts.switches) {
         processor[`program${sw}Switch`] = 1;
     }
@@ -161,11 +173,22 @@ async function main() {
 
     processor.insert(true);         // boot from the card reader (LOAD key)
 
-    const deadline = Date.now() + opts.timeout;
+    const startTime = Date.now();
+    const deadline = startTime + opts.timeout;
     let status = "timeout";
     let restarts = 0;
     let lastProgress = null;
     while (Date.now() < deadline) {
+        if (opts.trace && !processor.tracing) {
+            if (opts.traceAfter > 0 && cardReader.cardsRead >= opts.traceAfter) {
+                processor.tracing = true;
+                console.error(`<Tracing enabled after ${cardReader.cardsRead} card(s)>`);
+            } else if (opts.traceDelay > 0 && Date.now() - startTime >= opts.traceDelay) {
+                processor.tracing = true;
+                console.error(`<Tracing enabled after ${opts.traceDelay}ms>`);
+            }
+        }
+
         if (processor.gateCHECK_STOP.value) {
             status = "check-stop";
             break;
@@ -247,6 +270,14 @@ async function main() {
             }
         }
     }
+
+    // Processor.run() re-invokes itself fire-and-forget from device
+    // callbacks (see HeadlessCardReader.initiateRead()'s comment) and
+    // envir.throttle() re-arms real setTimeout timers as it goes, so the
+    // event loop never empties on its own once the machine is running --
+    // without an explicit exit, node keeps going (and tracing/printing)
+    // indefinitely past this point instead of stopping when we do.
+    process.exit(status === "check-stop" ? 1 : 0);
 }
 
 main();
