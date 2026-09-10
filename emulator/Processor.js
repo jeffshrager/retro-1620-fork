@@ -3310,7 +3310,10 @@ class Processor {
         }
 
         // Trace the instruction just completed.
-        if (this.tracing && this.opBinary >= 0) {       // to avoid tracing nothing after a START
+        if (this.tracing && this.opBinary >= 0 && this.opThisAtts) {
+            // opThisAtts is null after a LOAD/INSERT synthesizes the initial
+            // RN directly (bypassing normal decode), so guard against that
+            // as well as tracing nothing after a START.
             this.tracePData = this.tracePOperand();
             this.traceInstruction();
             this.opBinary = -1;
