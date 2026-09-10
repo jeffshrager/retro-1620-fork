@@ -122,3 +122,60 @@ IPL-V-Subroutines.card
 simple.ipl
     A minimal IPL-V program that runs, but effectively does nothing.
 
+
+Load order
+-----------
+
+To run an IPL-V program, feed the card reader, in this exact order:
+
+    1. IPL-V-Interpreter-Deck-1.card
+    2. Your program's own source cards (e.g. Ackermann.ipl or simple.ipl)
+    3. IPL-V-Subroutines.card
+    4. IPL-V-Interpreter-Deck-2.card
+
+(If using the Modification Letters 3 & 4 patch in Mod-3-4/, substitute
+Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card and -Deck-2.card for steps 1
+and 4; IPL-V-Subroutines.card is unchanged and still comes from here.)
+
+This order is not arbitrary -- it follows from what each deck actually
+is:
+
+  * Deck-1 is the object code for the IPL-V *assembler/loader*, not the
+    interpreter itself. It's a bootstrap program: once running, it reads
+    whatever cards come next from the reader and assembles them -- laying
+    out regions, building the linked-list representation of each routine,
+    resolving symbolic references -- into the in-memory form IPL-V
+    actually runs. It does not know how to interpret raw 1620 machine
+    code; it only understands IPL-V's own card-column source notation
+    (the same notation Ackermann.ipl/simple.ipl are written in).
+
+  * That's why your program's source cards must come immediately after
+    Deck-1: they are exactly the kind of material Deck-1 knows how to
+    read and assemble, and there's nothing else Deck-1 could do with them
+    if fed at any other point.
+
+  * IPL-V-Subroutines.card is written in that same source notation (it's
+    a set of standard "J" utility routines, not raw machine code), so it
+    also has to go through Deck-1's assembly process -- which is why it's
+    positioned right after your program rather than, say, being part of
+    Deck-2's object code. It comes after your program (not before) so
+    your program's own definitions are assembled first.
+
+  * Deck-2 -- the actual interpreter runtime -- comes last because
+    nothing can be *run* until it has been fully *assembled* first. Deck-1
+    keeps reading and assembling source cards (your program, then the
+    subroutines) until it recognizes the boundary marking "end of source
+    material" and loads Deck-2 next. Deck-2 places the relocatable J-
+    routine primitives and the rest of the interpreter into memory, then
+    the machine begins actually executing the program that was just
+    assembled (this is the "PROGRAM BEGINS AT <your start routine>" line
+    you'll see at the very end of a load if IPL-V's own trace/dump
+    facility is enabled -- see tools/cli/README.md's "Program Switches"
+    section).
+
+This ordering has been confirmed empirically, not just inferred from the
+file descriptions above: tools/cli/run1620.mjs, loading the decks in
+exactly this order, reproduces Paul Kimpel's independently-captured IPL-V
+traces (see Mod-3-4/IPL-V-Punch-Trace-Ack-1-0-20260823.txt) byte for
+byte.
+
