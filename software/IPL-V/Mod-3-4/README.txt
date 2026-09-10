@@ -110,24 +110,53 @@ been done yet.
 
 An earlier version of this note claimed a specific trace column showed
 region K1 (which should hold constant 1) instead reading back as 10000.
-That is probably a misreading of the trace format (that column looks more
-likely to be the raw content of whatever cell H0 currently points to, not
-literally "K1's value" -- the same ~10000-ish figure shows up in the same
-position in the successful Ackermann(1,0) trace too), and should not be
-relied on without going back through the trace format used at
-IPL-V-Interpreter-Listing.lst line ~1873's header (LEVEL CIA HS P Q SYMB
-LINK S (0) CONTENTS-OF-(0) H3) to confirm what each column actually is.
-What IS a solid, repeatable observation: whatever value ends up in that
-"CONTENTS OF (0)" column diverges from a small, sane number to something
-~10000 in magnitude at the first recursive descent in every n>0 case, and
-then drifts by further ~10000 increments each additional recursion level,
-exactly tracking with unbounded recursion depth and the eventual H2
-exhaustion. Pinning down which specific instruction introduces that
-~10000-ish value, and whether it is a genuine 1620-port bug, an
-Ackermann.ipl transcription error, or an emulator bug, needs deliberate
-instruction-level tracing through PSHDN/GET1/GET3 (now practical to do
-quickly with tools/cli/run1620.mjs's --trace flag, which did not
-previously exist) cross-referenced against IPL-V-Interpreter-Mod-3-4-Listing.lst.
+That specific column-level claim was a misreading of the trace format
+(that column is the raw content of whatever cell H0 currently points to,
+not literally "K1's value" -- the same ~10000-ish figure shows up in the
+same position in the successful Ackermann(1,0) trace too, since K1 is
+legitimately what's on top of the pushdown stack at that point in BOTH
+cases). But going back through it with instruction-level tracing (using
+tools/cli/run1620.mjs's --trace flag, gated with the new --trace-delay/
+--trace-after options to skip past the very long non-interesting load and
+system-initialization phase -- a full instruction trace of that phase
+alone runs tens of millions of lines) found something concrete:
+
+Using Ackermann-TEST.ipl (m=1,n=1), the moment M0's displayed value first
+goes wrong (monitor-trace "COMPUTE A(M-1,1) OR A(M-1,A(M,N-1))" step,
+address 19211, on its second visit) is directly preceded, every single
+time this code re-executes on each recursion level, by this exact
+instruction pair (relocated runtime addresses -- these do NOT match
+IPL-V-Interpreter-Mod-3-4-Listing.lst's static addresses, since Deck-2's
+primitives are relocated at load time):
+
+    <TRACE> 07538 22 07181 07169: S  22 07181 07169  P=]00000999R  Q=]000010000
+    <TRACE> 07562 26 1788O 07181: TF 26 18587 07181  *P=]1000000999R  Q=]1000000999R
+
+07169 holds K1's raw memory word (confirmed a few instructions earlier,
+"TF D6,H0-5,11" at listing-matching address 06244, reading H0 -- which
+points at K1 immediately after "INPUT 1" pushes it -- into scratch D6,
+content "010000010000", which is K1's original assembled word verbatim).
+18587 is region M0's address per Ackermann-TEST.ipl's own DEFINE REGIONS
+listing. So this subtracts something (P, a value that increments by
+exactly 1 on every recursion level -- ...999R, 999Q, 001999Q, 002999Q...,
+tracking recursion depth) from a fixed field of K1's word that happens to
+read as 10000 (Q, identical on every single one of dozens of iterations
+observed), and stores the result directly into M0's cell. That's exactly
+the mechanism producing the M/N corruption seen in the monitor trace
+(-9999, -19998, -29998, ... draining toward eventual H2 exhaustion).
+
+What's NOT yet certain: whether reading a 5-digit-wide field of K1's word
+(getting 10000) where a 1-digit field (getting 1) was intended is itself
+the bug, whether writing this particular result into M0 at all is
+correct-but-misapplied logic from some OTHER primitive (not really "about"
+K1 or M0, just operating on whatever's currently referenced), or whether
+this is a real, if convoluted, part of the intended pushdown/GET3
+mechanism and the actual bug is one step further back or forward from
+this pair. Untangling that needs either the RAND manual's account of the
+internal P/Q/SYMB/LINK word layout applied precisely to this instruction
+pair, or Beyer's own (currently undiscovered) comments on GET1/GET3/PSHDN,
+neither of which has been done yet -- but the search space is now this one
+specific instruction pair, not "somewhere in recursion."
 
 One genuine emulator bug was found and fixed in the process: enabling
 processor.tracing before the very first LOAD/INSERT crashed
