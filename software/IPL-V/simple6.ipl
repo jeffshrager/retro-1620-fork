@@ -1,0 +1,14 @@
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 E0            2
+                                        2 A0            5
+                                        5       00
+      EXECUTE A0, TRACE IT (Q=3)          E0    03A0
+      PRINT RESULT, QUIT.                         J152  0
+                                        1
+                                        5       00
+      GET SYMB A3                         A0    10A3
+      INCREMENT, EXIT WITH J8=30H0              00J125  J8
+                                        1
+                                        5       01
+      CONSTANT 3                          A3    01      3
+      START CARD. EXECUTE E0            5         E0
