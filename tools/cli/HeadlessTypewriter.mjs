@@ -80,9 +80,14 @@ class HeadlessTypewriter {
         (character/carriage-return timing). Resolving near-instantly here
         can let two such fire-and-forget chains overlap in ways the real,
         slower device never would, tripping Processor's "Multiple
-        instances of this.run() active" guard -- so impose a small real
-        delay to keep them naturally serialized */
-        await new Promise(resolve => setTimeout(resolve, 5));
+        instances of this.run() active" guard -- so impose a real delay at
+        least as long as the real device's slowest control interlock
+        (Typewriter.returnInterlock/indexInterlock = 124ms) to keep them
+        naturally serialized. A shorter delay (previously 5ms) works most
+        of the time but is not reliable -- confirmed by a deterministic
+        reproduction (simple2.ipl consistently hit the race at the exact
+        same point in loading with a 5ms delay). */
+        await new Promise(resolve => setTimeout(resolve, 130));
 
         switch (code & Register.bcdMask) {
         case 1:          // output a space
