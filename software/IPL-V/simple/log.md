@@ -11,6 +11,58 @@ oldest-first order; from the next entry on, newest entries go at the
 
 ---
 
+## 2026-09-12 (afternoon, later) — `simple12.ipl` (Jeff's): `J64` alone, inserting into an already-populated list
+
+Built directly on the now-fixed `simple11.ipl`: locate `L3` (`J62`), then
+call `J64` directly to insert a new symbol `L7` right after it, then
+reload `L1` and print the whole list with `J151`.
+
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      START A0 GET SYMB L1                A0    10L1
+      WE WILL FIND L3                           10L3
+      FIND IT                                     J62
+      INSERT L7 AFTER L3                        10L7
+                                                  J64
+      PRINT OUT THE LIST NOW                    10L1
+      PRINT THE LIST, QUIT.                       J151  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      THE LIST L1.                        L1      0
+                                                  L2
+                                                  L3
+                                                  L4    0
+      START AT A0                       5         A0
+```
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple12.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Actual:** clean halt, **no crash of any kind**. 5 cards punched:
+`L1 0400000`, `L2`, `L3`, `L7`, `L4` -- `L7` correctly inserted right
+after `L3`, exactly as intended. Trace saved at `traces/simple12_plain.log`.
+
+**Analysis:** `J64` called directly, against an already-populated,
+statically-built list, works correctly -- this rules out "any call to
+`J64` crashes" as an explanation for the `F1.ipl`/`simple10.ipl` `RESBLK`
+crash. That crash happens specifically when inserting into a list that
+was just created *empty* via `J90`. Next isolation point for this
+thread: does `J64` still work when the target list is a `J90`-created
+empty list (skipping `J62`/`J66`'s search logic entirely and calling
+`J64` directly on it), or does it fail only in that specific
+just-created-empty-list case?
+
+---
+
 ## 2026-09-12 (afternoon) — `simple11.ipl`: isolating `J62` (the "locate" half of `J66`), and a real logging lapse
 
 Continuing the `F1.ipl`/`RESBLK` thread: since `IPL-V-Interpreter-Mod-3-4.sps`
