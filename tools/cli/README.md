@@ -174,6 +174,13 @@ something else.
   keyboard) — everything must come from the initial card hopper.
 - The polling loop's ~750ms settle delay before each auto-restart, and the
   ~20ms base poll interval, add real wall-clock overhead on top of the
-  emulator's own (throttled, real-1620-speed) execution time — a run that
-  needs many restarts will take noticeably longer under this driver than
-  the emulator's raw execution time alone.
+  emulator's own execution time — a run that needs many restarts will
+  take noticeably longer under this driver than the emulator's raw
+  execution time alone.
+- By default this driver disables `envir.throttle()`'s real-1620-speed
+  pacing (there's no real hardware to stay in sync with), so runs
+  complete as fast as the host CPU allows — pass `--real-time` to restore
+  the normal throttled timing if you're specifically investigating a
+  timing-sensitive device interlock. Without `--real-time`, even the
+  small `simple*.ipl` test programs (which still load the full ~700+
+  card interpreter deck) drop from ~15-16s to ~3-4s wall-clock.

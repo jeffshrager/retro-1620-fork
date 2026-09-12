@@ -119,8 +119,12 @@ IPL-V-Subroutines.card
     after the source program and immediately before Deck-2 in the card
     reader.
 
-simple.ipl
-    A minimal IPL-V program that runs, but effectively does nothing.
+simple/
+    Small, incrementally-built IPL-V test programs (simple1.ipl through
+    simple8.ipl) used to validate individual interpreter primitives in
+    isolation, plus simple/log.md, a running experiment log for this
+    series. simple1.ipl (formerly simple.ipl) is a minimal IPL-V program
+    that runs, but effectively does nothing.
 
 
 Load order
@@ -129,7 +133,7 @@ Load order
 To run an IPL-V program, feed the card reader, in this exact order:
 
     1. IPL-V-Interpreter-Deck-1.card
-    2. Your program's own source cards (e.g. Ackermann.ipl or simple.ipl)
+    2. Your program's own source cards (e.g. Ackermann.ipl or simple/simple1.ipl)
     3. IPL-V-Subroutines.card
     4. IPL-V-Interpreter-Deck-2.card
 
@@ -147,7 +151,7 @@ is:
     resolving symbolic references -- into the in-memory form IPL-V
     actually runs. It does not know how to interpret raw 1620 machine
     code; it only understands IPL-V's own card-column source notation
-    (the same notation Ackermann.ipl/simple.ipl are written in).
+    (the same notation Ackermann.ipl/simple/simple1.ipl are written in).
 
   * That's why your program's source cards must come immediately after
     Deck-1: they are exactly the kind of material Deck-1 knows how to

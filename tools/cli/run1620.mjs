@@ -26,6 +26,15 @@
 *                         been read (default 0, i.e. immediately) -- lets
 *                         you skip the noisy load-deck portion of a trace
 *                         and capture only the actual program execution.
+*   --real-time            Keep the emulator's normal real-1620-speed
+*                         throttling (envir.throttle()) instead of the
+*                         default, which disables it so runs complete as
+*                         fast as the host CPU allows. There's no
+*                         real hardware to stay in sync with here, so the
+*                         default is unthrottled; pass this flag only if
+*                         you specifically need to reproduce real-1620
+*                         timing (e.g. investigating a timing-sensitive
+*                         device interlock).
 *
 * Multi-phase 1620 boot decks (like the IPL-V load deck) conventionally
 * HALT between phases and expect the operator to press START to
@@ -51,6 +60,7 @@ function parseArgs(argv) {
         maxRestarts: 500,
         traceAfter: 0,
         traceDelay: 0,
+        realTime: false,
         files: []
     };
 
@@ -80,6 +90,9 @@ function parseArgs(argv) {
             break;
         case "--trace-delay":
             opts.traceDelay = Number(argv[++x]);
+            break;
+        case "--real-time":
+            opts.realTime = true;
             break;
         default:
             opts.files.push(arg);
@@ -151,6 +164,15 @@ async function main() {
     };
 
     const processor = new Processor(context);
+    if (!opts.realTime) {
+        // No real hardware to stay in sync with here -- skip the
+        // artificial delay envir.throttle() normally inserts to pace
+        // execution to real-1620 speed, so runs complete as fast as the
+        // host CPU allows instead of taking ~15s+ just to load the
+        // interpreter's own ~700+ card deck.
+        processor.envir.throttle = () => Promise.resolve();
+    }
+
     const cardReader = new HeadlessCardReader(processor, hopper);
     const typewriter = new HeadlessTypewriter(!opts.quiet);
     const cardPunch = new HeadlessCardPunch(!opts.quiet);
