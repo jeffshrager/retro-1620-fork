@@ -11,6 +11,185 @@ oldest-first order; from the next entry on, newest entries go at the
 
 ---
 
+## 2026-09-12 (evening, later) — `F1.ipl` itself confirmed fixed by dropping the Mod-3-4 patch
+
+Direct follow-up to the root-cause finding below: reran `notes/F1.ipl`
+itself (not just the `simple13.ipl` isolation) against the original,
+unpatched interpreter deck.
+
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/IPL-V-Interpreter-Deck-1.card \
+  notes/F1.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/IPL-V-Interpreter-Deck-2.card \
+  --timeout 30000
+```
+
+**Actual:** clean halt, no crash. 4 cards punched: `14723 0400000`
+(header), `04B1`, `04C1`, `04A1`. Trace saved at
+`traces/F1_unpatched.log`.
+
+**Analysis:** correct result. `F1.ipl`'s input list `K1` is
+`[B1, C1, B1, A1, A1, B1]` (6 elements, 3 distinct symbols); `F1`'s job
+is to produce an output list with exactly one occurrence of each distinct
+symbol. The output list contains exactly `B1`, `C1`, `A1` -- correctly
+deduplicated. This is the program whose crash motivated the entire
+`RESBLK`/`J66`/`J62`/`J64`/`simple10`-`13` investigation this session,
+now confirmed running correctly end-to-end once the Modification Letter
+3/4 patch (specifically its `CF D6-4` addition to `J66`) is removed.
+
+Same open loose end as `simple13.ipl`'s unpatched run: each output symbol
+carries an unexplained `04` prefix (`04B1` etc.) not seen in Mod-3-4-
+interpreter list prints (`simple8`/`simple9`, which show bare `L2`/`L3`/
+`L4`). Not yet investigated -- doesn't block the headline result (no
+crash, correct deduplication), but should be understood before treating
+the unpatched interpreter as fully clean.
+
+---
+
+## 2026-09-12 (evening) — Root cause found: the `RESBLK` crash is a Modification Letter 3/4 regression, not an original-interpreter bug
+
+Jeff added `notes/J66.png`, a photo of the original (pre-Mod-3-4) SPS
+assembly listing for `JJ66`, and asked to check the transcription for a
+typo. Compared it line-by-line against both listing files already in the
+repo:
+
+**`software/IPL-V/IPL-V-Interpreter-Listing.lst`** (original, matches
+the photo exactly):
+```
+00084  BTM PSHDN,H0
+00096  TF  H0-5,D6
+00108  BT  J64-5,JJ66-1,16,
+```
+
+**`software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Listing.lst`**
+(after Paul's Modification Letter 3/4 patch):
+```
+00084  BTM PSHDN,H0
+00096  CF  D6-4          <- opcode 33, operand address 07165
+00108  TF  H0-5,D6
+00120  BT  J64-5,JJ66-1,16,
+```
+
+No transcription typo relative to the photo -- the `.sps` source
+(`IPL-V-Interpreter-Mod-3-4.sps:2024`, tagged `MOD-3`) correctly matches
+what it assembles to. But this confirms the `CF D6-4` instruction was
+**added to `J66`'s glue code by the Modification Letter 3/4 patch itself**,
+and does not exist in the original interpreter at all -- something
+`Mod-3-4/README.txt` never mentioned (it only documents the unrelated
+`TNF` odd-address Punch Check fix).
+
+Crucially, this exact instruction matches our crash trace bit-for-bit:
+`simple10.ipl`/`simple13.ipl`'s crash traces both end with
+`CF 33 07165 00000` immediately before the `MAR Check` check-stop -- same
+opcode, same operand address as this newly-inserted line.
+
+**Test:** reran `simple13.ipl` against the *original*, unpatched
+interpreter deck (`software/IPL-V/IPL-V-Interpreter-Deck-1.card` /
+`-Deck-2.card`, no Mod-3-4):
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/IPL-V-Interpreter-Deck-1.card \
+  software/IPL-V/simple/simple13.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/IPL-V-Interpreter-Deck-2.card \
+  --timeout 30000
+```
+**Actual:** clean halt, **no crash at all**. 5 cards punched: `L1
+0400000`, `04L1`, `L2`, `L3`, `L4`, `THE END 4`. Trace saved at
+`traces/simple13_unpatched.log`.
+
+**Analysis:** confirmed root cause -- the `RESBLK`/`MAR Check` crash
+chased all session (`F1.ipl`, `simple10.ipl`, `simple13.ipl`) is caused
+specifically by the `CF D6-4` instruction Modification Letter 3/4 inserted
+into `J66`, not by any bug in the original interpreter or in `J62`/`J64`
+themselves (consistent with `simple11`/`simple12` both working -- neither
+exercises this particular inserted instruction the same way `J66` does).
+Removing the patch (using the original deck) eliminates the crash
+entirely. One loose end, not yet explained: the unpatched run's list
+output has an extra, slightly odd `04L1` line not present in other clean
+list-print results -- flagging it, not yet investigated, since it didn't
+block the headline result (no crash).
+
+Open question for next steps: whether `CF D6-4` is genuinely what
+Modification Letter 3 (the real historical document, linked from
+`Mod-3-4/README.txt`) specifies here, or whether it's a transcription/
+application error *of the modification itself* (as opposed to a
+transcription error of the original interpreter, which this line is not).
+
+---
+
+## 2026-09-12 (afternoon, later still) — `simple13.ipl` (Jeff's): `J66` itself crashes even on a "should be a no-op" search
+
+Follow-up to `simple11.ipl` (`J62` alone: works) and `simple12.ipl`
+(`J64` alone, inserting into a populated list: works). This one calls
+`J66` directly (the combined locate-or-insert dispatcher) against the
+same populated `L1->L2->L3->L4` list, searching for `L3` -- which is
+already present, so the comment marks it "(NOOP!)": expected to find it
+and do nothing.
+
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      START A0 GET SYMB L1                A0    10L1
+      FIND OR INSERT L3 (NOOP!)                 10L3
+                                                  J66
+      PRINT OUT THE LIST NOW                    10L1
+      PRINT THE LIST, QUIT.                       J151  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      THE LIST L1.                        L1      0
+                                                  L2
+                                                  L3
+                                                  L4    0
+      START AT A0                       5         A0
+```
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple13.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Expected:** clean halt, list unchanged, since `L3` is already present.
+
+**Actual:** the exact same crash as `F1.ipl`/`simple10.ipl`: `MAR Check:
+fetch() invalid memory address=70603`, zero cards punched. Traces saved
+at `traces/simple13_monitor.log` and `traces/simple13_instr.log`.
+
+**Analysis:** compared the raw instruction trace's final steps against
+`simple10.ipl`'s saved crash trace (`traces/simple10_instr.log`) --
+identical, not just the same final address:
+```
+CF   33 07165 00000   P=1
+TF   26 17886 07169   P=]0187...  Q=]0187...
+>>CHECK STOP: MAR Check: fetch() invalid memory address=70603
+```
+Since `J62` alone and `J64` alone both run clean (`simple11`/`simple12`),
+this `CF`/`TF` pair must belong to `J66`'s own glue code (`JJ66` in
+`IPL-V-Interpreter-Mod-3-4.sps`), not either sub-primitive's body.
+Specifically, it matches the `CF D6-4` / `TF H0-5,D6` step that
+immediately precedes `J66`'s branch into `J64` (the "not found, go
+insert" path) -- **not** the early-return `BT POPH0,JJ66-1,1` path that
+should fire when the symbol is already found. Since `L3` genuinely is
+already on this list, `J66` should have taken the early-return path and
+never reached this code at all -- but it took the insert path anyway and
+crashed at the identical point as `simple10.ipl`'s genuinely-empty-list
+case. Two implications: (1) `J66`'s own found/not-found branch may not
+be working correctly (always falling through to "insert"), and (2) the
+real, singular bug is in this shared setup code right before the branch
+into `J64`, independent of whether an insert was actually warranted --
+consistent with `J64` itself working fine when called directly, since
+`J66` apparently never actually gets there.
+
+---
+
 ## 2026-09-12 (afternoon, later) — `simple12.ipl` (Jeff's): `J64` alone, inserting into an already-populated list
 
 Built directly on the now-fixed `simple11.ipl`: locate `L3` (`J62`), then
