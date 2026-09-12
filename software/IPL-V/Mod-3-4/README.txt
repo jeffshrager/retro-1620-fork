@@ -61,6 +61,13 @@ Ackermann-TEST.ipl
     to study the Ackermann(1,1) failure without the "hoary recursion" of the
     full A(3,3) case.
 
+Ackermann-TEST-Fixed.ipl
+    Identical to Ackermann-TEST.ipl except its K1/M0/N0 CONSTANT/VALUE
+    cards' single-digit values are right-justified in their 5-digit LINK
+    field (column 60, not 56) -- see the "RESOLVED (2026-09-12)" note
+    below. With this fix, A(1,1) computes correctly as 3 and halts
+    cleanly.
+
 IPL-V-Punch-Trace-Ack-1-0-20260823.txt
 IPL-V-Punch-Trace-Ack-1-1-20260823.txt
     IPL-V's own trace output (not the emulator's instruction trace),
@@ -163,3 +170,40 @@ processor.tracing before the very first LOAD/INSERT crashed
 (Processor.enterICycle() called tracePOperand() before opThisAtts was ever
 set, since insert() synthesizes the initial RN directly rather than going
 through normal instruction decode). Fixed in emulator/Processor.js.
+
+RESOLVED (2026-09-12): the "not yet certain" question two paragraphs above
+-- whether reading a 5-digit-wide field of K1's word (getting 10000) where
+a 1-digit field (getting 1) was intended is itself the bug -- is yes,
+confirmed directly. A separate, unrelated line of investigation (building
+a series of small `simple*.ipl` test programs from scratch, see
+../simple/log.md and ../../seshsums/20260911b_seshsum.md) independently
+discovered that IPL-V's data-card LINK field is a fixed 5-digit field
+(`LINK DS 5` in IPL-V-Interpreter-Mod-3-4.sps) that must be
+right-justified: a single-digit constant belongs in the field's last
+column (60), not its first (56). Every hand-punched `simple*.ipl` test
+written before that discovery had left-justified its constants, inflating
+every value by 10000x -- exactly the "K1 reads back as 10000" signature
+described above.
+
+Ackermann-TEST.ipl's own CONSTANT/VALUE cards (K1=1, M0, N0) have this
+same left-justification error (value digit at column 56 instead of 60).
+Ackermann-TEST-Fixed.ipl and Ackermann-Fixed.ipl (new, alongside
+Ackermann-TEST.ipl and ../Ackermann.ipl respectively in this and the
+parent directory) are byte-identical to the originals except that these
+three value digits are moved to column 60. Confirmed: Ackermann-TEST-Fixed.ipl
+(m=1,n=1) now halts cleanly and prints the correct result, 3. Even more
+significantly, Ackermann-Fixed.ipl (m=3,n=3, the original full test case)
+also halts cleanly and prints 61 -- the mathematically correct value of
+A(3,3). This fully resolves the "n>0 always fails" problem that motivated
+this entire directory's investigation: it was never a pushdown/list-space
+bug in the interpreter (H2 exhaustion, PSHDN/GET1/GET3, etc., all as
+originally suspected) -- it was a hand-transcription error in
+Ackermann.ipl's own source card columns, the same class of bug (and same
+fix) independently found via the unrelated simple*.ipl test series. The
+PSHDN/GET1/GET3 internals implicated above were never actually broken;
+they were faithfully computing with a corrupted input value.
+
+(A different, still-open interpreter bug -- a hard check-stop in the
+COLSYM/RESBLK list-cell-allocation machinery, unrelated to this one -- was
+found via the same simple*.ipl series; see ../simple/log.md's
+simple10.ipl entry and traces/ in the repo root for that investigation.)

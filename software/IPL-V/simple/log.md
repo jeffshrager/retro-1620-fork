@@ -11,6 +11,205 @@ oldest-first order; from the next entry on, newest entries go at the
 
 ---
 
+## 2026-09-11 23:30 PDT — `simple10.ipl` (new: minimal reproduction of the still-open `F1.ipl` crash)
+
+Starts a new thread of experiments (rather than one-off `F1.ipl`
+investigation) targeting the recursion/list-space bug first flagged by
+Paul Kimpel, localized in an earlier session to the very first `J66`
+(`COLSYM`, "add symbol to list if not already present") call in
+`F1.ipl` — the first attempt to insert a symbol into a freshly-created,
+still-empty output list, which coincides with the interpreter's very
+first `RESBLK` ("reserve block") call in the whole run.
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple10.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Program:** identical `E1` (executive) + `F1` (worker) routine bodies to
+`notes/F1.ipl`, and all six of its region declarations (`A0`-`F0`, `K0`)
+kept even though only `K0` is used — see the load-time gotcha below.
+Only change: the input list `K1` is shrunk from 6 elements
+(`B1,C1,B1,A1,A1,B1`) to 1 (`K2`, self-referencing the already-declared
+`K0` region, the same trick used in `simple8`/`simple9` — no need for a
+separate content region).
+```
+      TYPE=9, FIRST CARD.               9
+      MINIMAL REPRO OF F1 FAILURE.      1
+      THE A-REGION=10 CELLS, A0-A9.     2 A0            10
+      THE B-REGION=10 CELLS, B0-B9.     2 B0            10
+      THE C-REGION=10 CELLS, C0-C9.     2 C0            10
+      THE E-REGION=10 CELLS, E0-E9.     2 E0            10
+      THE F-REGION=10 CELLS, F0-F9.     2 F0            10
+      THE K-REGION=10 CELLS, K0-K9.     2 K0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      Q=3 SAYS TRACE THIS ROUTINE.        E1    13K1
+      EXECUTE F1 AND                              F1
+      PRINT THE OUTPUT LIST.                      J151  0
+      ROUTINE HEADER, TYPE=5,Q=0.       5       00
+      CREATE AN EMPTY OUTPUT LIST.        F1    04J90
+      PRESERVE W0.                              40W0
+      W0 HOLDS NAME OF OUTPUT LIST.             20W0
+      LOCATE NEXT CELL OF INPUT LIST.     9-1     J60
+      GO TO 9-2 IF NO NEXT CELL.                709-2
+      INPUT THE SYMBOL IN THE CELL.             12H0
+      INPUT THE NAME OF THE OUTPUT LIST.        11W0
+      REVERSE THEIR POSITION IN H0, AND           J6
+      ADD THE SYMBOL TO THE OUTPUT LIST           J66   9-1
+      PUT THE NAME OF THE OUTPUT LIST     9-2   51W0
+      IN H0 AND RESTORE W0 BEFORE               30W0    0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      THE LIST K1.                        K1      0
+                                                  K2    0
+      START CARD. EXECUTE E1.           5         E1
+```
+
+**Load-time gotcha found along the way:** a first attempt dropped the
+unused `A0`/`B0`/`C0`/`E0`/`F0` region declarations entirely (keeping
+only `K0`, the one actually referenced). That load produced
+`UNDEFINED REGIONAL SYMBOL` errors on labels that have nothing obviously
+to do with those regions (`TYPE9 +5`, `E1 +1`, `E1 +4`, `K1 +2`,
+`J170 +10`) — and, notably, the check-stop still happened at the same
+address (`70603`), so the crash itself wasn't caused by this. Restoring
+all six original region declarations (unused ones included) made the
+load-time errors disappear completely, with no other change. Not
+explained yet — logged as a separate open question: something about the
+assembler's symbol-table layout appears sized/offset relative to the
+*number* of `DEFINE REGIONS`-type cards in the deck, not just which
+regions are actually referenced. Worth remembering before trimming region
+declarations in future minimal repros.
+
+**Expected:** the same `MAR Check: fetch() invalid memory
+address=70603` check-stop as `F1.ipl` itself, at the same `J66` call,
+regardless of the input list's length (since the crash was already
+localized to the *first* `J66` call specifically).
+
+**Actual:** Confirmed exact match.
+- Plain run: identical check-stop, `MAR Check: fetch() invalid memory
+  address=70603`, zero cards punched (crashes before ever reaching
+  `J151`).
+- `--switches 1,2,3,4` monitor trace confirms it dies at the identical
+  point in the routine: the trace's last successful step is
+  `J66 19631 ... K2 ... 00000` (the `ADD THE SYMBOL TO THE OUTPUT LIST`
+  call), immediately followed by the check-stop — same statement, same
+  primitive, same address, as in the original 6-element-list run.
+
+**Analysis:** Success — this is now a clean, minimal, committed starting
+point for a dedicated experiment thread on this bug (rather than reusing
+`notes/F1.ipl` directly, which is untracked, was written by Paul rather
+than as part of this series, and carries extra scaffolding not needed
+once the crash is already localized to a single primitive call). Next
+experiments in this thread can build on `simple10.ipl` directly — e.g.
+varying what's on the input list, trying an already-non-empty output list
+(skip `J90`, use a statically-declared one-element list instead, as
+`simple8.ipl` showed works), or adding tracing/memory inspection focused
+specifically on the `TF` instruction's operands (`NMBR`/`LADR`) right
+before the crash, per the still-open question flagged in
+`20260911b_seshsum.md`.
+
+---
+
+## 2026-09-11 23:05 PDT — `simple9.ipl` (new: build a list via `GET SYMB` pushes, not `DATA HEADER` cells)
+
+Follow-up to `simple8.ipl`: that test built its list the "static" way, via
+`DATA HEADER`/list-cell cards declared at load time. This test instead
+builds a list purely at runtime, by calling `GET SYMB` (op `10`) five
+times in a row with no `PRINT`/`J152` in between, then a single
+`PRINT THE LIST, QUIT.` (`J151`) at the end.
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple9.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Program:**
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      START A0 GET SYMB L1                A0    10L1
+                                                10L2
+                                                10L3
+                                                10L4
+                                                10H0
+      PRINT THE LIST, QUIT.                       J151  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      START AT A0                       5         A0
+```
+
+**Expected (predicted before running):** based on `simple7.ipl`'s
+multi-`GET SYMB` ADD setup (push operand2, push operand1, push result-name
+again, before `J110` pops via the `GET3` convention), `GET SYMB` was
+suspected to be a genuine **push onto the H0 pushdown list**, not a
+same-register overwrite as it appeared to be in the single-push
+`simple1`-`simple6.ipl` tests (where only one item was ever on the stack
+at a time, so push-vs-overwrite was indistinguishable). If so, pushing
+`L1`, `L2`, `L3`, `L4`, then `H0` should build a 5-element list under H0
+in LIFO order, and `J151` should print all five elements — not just the
+last one pushed.
+
+**Actual:** Clean halt, no errors. Card punch (5 cards): a header card
+showing `H` / `H` (two tokens, at the same two column offsets `simple8`'s
+`L1 0400000` header card used for name/pointer-encoding), followed by
+`L4`, `L3`, `L2`, `L1` — in that exact order. Typewriter: `THE END    6`.
+
+**Analysis:** Confirms the hypothesis. The print order (`H0`, `L4`, `L3`,
+`L2`, `L1`) is precisely the *reverse* of the push order in the source
+(`L1, L2, L3, L4, H0`) — i.e. last-pushed-prints-first, the signature of
+a LIFO pushdown list built by repeated `GET SYMB` calls with `H0` as the
+list head/top-of-stack pointer. `J151` walks that same pushdown chain
+head-to-tail, exactly as it walked the statically-declared `L1->L2->L3
+->L4` chain in `simple8.ipl`. Pushing the symbol `H0` itself (the pushdown
+list's own head register) as the final "content" item worked without
+error and round-tripped cleanly — it's a valid regional reference
+(`H`-region, cell `0`) like any other, even though H-cells are normally
+used internally by the interpreter rather than as ordinary data. Key
+transferable lesson: **`GET SYMB` is IPL-V's push-onto-H0-list primitive,
+not a plain assignment** — every `simple*.ipl` test so far that only ever
+pushed one item at a time looked like an overwrite purely because a
+1-element stack and an overwritten register are indistinguishable from
+the outside.
+
+**Addendum (same session, follow-up question):** Jeff pushed back on
+over-generalizing this result: "generally speaking, pushing to lists
+works... unless the interpreter has specialized code for H0." Correct
+concern — checked directly with a full untruncated `--trace` of this same
+run (no delay, ~93,900 lines) and grepped for both list-space-allocator
+entry points used elsewhere (`FNDBLK` at `08002`, `RESBLK` at `08248`,
+per the `F1.ipl` investigation in `20260911b_seshsum.md`):
+
+- `FNDBLK`: called exactly 32 times, all clustered early (last occurrence
+  at trace line 14391 of 93873) — matching the same "32 harmless bootstrap
+  calls" identified during interpreter H2-free-list initialization in the
+  `F1.ipl` trace, i.e. **not** triggered by this program's own logic.
+- `RESBLK`: called **zero** times.
+
+None of this program's 5 `GET SYMB` pushes, nor its `J151` print, touch
+either allocator. **Conclusion: `simple9.ipl` does not demonstrate that
+dynamic list growth works in general — it demonstrates that H0's
+pushdown-list push is a separate mechanism that bypasses the block
+allocator entirely**, almost certainly fixed/pre-reserved H-register
+storage rather than an ordinary dynamically-growable list. This is
+consistent with H being one of the reserved/special region letters. It
+says nothing about whether `J66`/`COLSYM` (the *actual* dynamic-list-growth
+primitive, and the one still crashing in `F1.ipl`) works on an ordinary
+list — that remains completely untested, and a minimal isolated test of
+it would just be a smaller reproduction of the still-open `F1.ipl` bug,
+not a new data point.
+
+---
+
 ## 2026-09-11 22:34 PDT — `simple8.ipl` (new: build and print a list)
 
 Pivoted here from an in-progress `F1.ipl` crash investigation (see

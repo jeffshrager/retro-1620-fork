@@ -20,3 +20,7 @@ $RECYCLE.BIN/
 
 # Project-specific files
 *.tws                   # TextPad Workspace files
+
+# CLI harness trace/debug output (regenerable, can be huge) -- see
+# tools/cli/README.md's "Trace files" section.
+/traces/

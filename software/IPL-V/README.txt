@@ -34,6 +34,14 @@ Repository files:
 Ackermann.ipl
     A small sample IPL-V program from Newell, et al.
 
+Ackermann-Fixed.ipl
+    Identical to Ackermann.ipl except its K1/M0/N0 CONSTANT/VALUE cards'
+    single-digit values are right-justified in their 5-digit LINK field
+    (column 60, not 56) -- see Mod-3-4/README.txt's "RESOLVED (2026-09-12)"
+    note. With this fix and the Mod-3-4 interpreter, A(3,3) computes
+    correctly as 61; without it, the un-right-justified value is read as
+    10000x too large and the program never terminates.
+
 IPL-V-Interpreter-Deck-1.card
     The first half of the 1620 load deck, containing the object code for
     the IPL-V assembler/loader. This file was created by extracting the
