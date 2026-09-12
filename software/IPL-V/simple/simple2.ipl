@@ -6,6 +6,6 @@
       GET SYMB A2                               10A2
       PRINT RESULT, QUIT.                         J152  0
                                         5       01
-      CONSTANT 7                          A1    01      7
-      CONSTANT 5                          A2    01      5
+      CONSTANT 7                          A1    01          7
+      CONSTANT 5                          A2    01          5
       START AT A0                       5         A0

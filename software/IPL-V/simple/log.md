@@ -11,6 +11,306 @@ oldest-first order; from the next entry on, newest entries go at the
 
 ---
 
+## 2026-09-11 22:34 PDT — `simple8.ipl` (new: build and print a list)
+
+Pivoted here from an in-progress `F1.ipl` crash investigation (see
+separate discussion — not logged in this file, whose scope is the
+`simple*.ipl` series) to try something more basic: construct a small
+IPL-V list and print it with `J151`, the list-print primitive `F1.ipl`
+itself uses.
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple8.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Program (final, working version):**
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      START A0 GET SYMB L1                A0    10L1
+      PRINT THE LIST, QUIT.                       J151  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      THE LIST L1.                        L1      0
+                                                  L2
+                                                  L3
+                                                  L4    0
+      START AT A0                       5         A0
+```
+
+**First attempt (failed) and the fix:** Built column-exact from
+`notes/F1.ipl`'s own known-working region/list-cell templates (verified
+token-for-token identical field positions), but used invented symbol
+names `X1`/`Y1`/`Z1` for the three list cells' content. That produced,
+during loading: `L1 +1  UNDEFINED REGIONAL SYMBOL`, `L1 +2  UNDEFINED
+REGIONAL SYMBOL`, `L1 +3  UNDEFINED REGIONAL SYMBOL` (region size wasn't
+the issue — tried both size 5 and size 10 for `L0`, same error either
+way; also ruled out the region *name* `L0`/`D0` as the problem via a
+substitution test). **Jeff's correction**: a list cell's content symbol
+in IPL-V isn't arbitrary label text — it's itself a region-letter +
+digit reference (exactly how `F1.ipl`'s own list content `B1`/`C1`/`A1`
+works: those are live references into `F1.ipl`'s already-declared `B0`/
+`C0`/`A0` regions, not just printable tags). `X1`/`Y1`/`Z1` referenced
+regions `X0`/`Y0`/`Z0` that were never declared. Fix: reuse the
+already-declared `L0` region for the content atoms too (`L2`, `L3`,
+`L4`), self-referential with the list's own continuation-cell addresses
+but syntactically fine.
+
+**Expected (after the fix):** A clean load, no "undefined regional
+symbol" errors, and `J151` printing the list's contents to the card
+punch.
+
+**Actual:** Card punch (4 cards punched): `L1 0400000`, `L2`, `L3`, `L4`.
+Typewriter: `THE END                     2`. Clean halt, no errors, no
+crash, no timeout.
+
+**Analysis:** Success — first working list-construction-and-print test
+in the `simple*.ipl` series. The list `L1 -> L2 -> L3 -> L4` was built via
+plain data-header cards (no `J90`/list-processing primitives involved
+yet, just the assembler's own static list-literal syntax) and printed
+correctly by `J151`, one punched card per element (header included). Key
+transferable lesson for future list-based `simple*.ipl` tests: **any
+symbol used as a list cell's content must itself be a valid, pre-declared
+regional reference** (either reusing the list's own region, as done
+here, or a separate region declared for that purpose, as `F1.ipl` does
+with its `A`/`B`/`C` regions) — it is not free-form text.
+
+## 2026-09-11 22:18 PDT — `simple7.ipl` (new: isolated `J110` ADD, right-justified)
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple7.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Program:** Same 3-operand `J110` calling convention validated last
+session (`hold_8.ipl`, formerly `simple8.ipl`: push operand 2, push
+operand 1, push the destination name again, call `J110`), renamed
+`A3`/`A4` → `A1`/`A2`, with the `CONSTANT` values now right-justified per
+the `simple6.ipl` fix above:
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            6
+                                        5       00
+      GET SYMB A2 (OPERAND 2)             A0    10A2
+      GET SYMB A1 (OPERAND 1)                   10A1
+      GET SYMB A1 AGAIN (RESULT NAME)           10A1
+      ADD THEM: A1 = A1 + A2                    00J110
+      INPUT A1 = RESULT (FRESH)                 10A1
+      PRINT RESULT, QUIT.                         J152  0
+                                        1
+                                        5       01
+      CONSTANT 3                          A1    01          3
+      CONSTANT 4                          A2    01          4
+      START AT A0                       5         A0
+```
+
+**Expected:** `A1`(=3) + `A2`(=4) = 7, punched as plain `7` (not
+`70000`), given the LINK-field fix now in place.
+
+**Actual:**
+- Card punch (1 card punched): `A1 01 7`.
+- Typewriter: `THE END                     6`.
+- Completed cleanly, no crash, no timeout.
+
+**Analysis:** Correct, and cleanly so this time — no scaling artifact to
+explain away. `J110`'s 3-operand `GET3` convention (destination pushed
+twice + one real operand) plus the right-justified constant format
+together produce exactly the right answer with a single punched card
+(only the fresh post-add `INPUT A1` print fires, since — per the
+STOP-marker finding two sessions back — there's only one terminating
+`PRINT RESULT, QUIT.  0` in this program, unlike `simple4`'s two-print
+version). First real "does the interpreter compute the right sum"
+confirmation with both known formatting bugs (STOP-marker
+misunderstanding, LINK left-justification) already accounted for.
+
+## 2026-09-11 22:16 PDT — Fixed and re-ran `simple1.ipl`-`simple5.ipl` with right-justified constants
+
+Follow-up to the `simple6.ipl` confirmation above: applied the same fix
+(right-justify each `CONSTANT` card's value digit to column 60, the last
+column of the 5-column LINK field) to `simple1.ipl` through `simple5.ipl`
+in place, then re-ran all five.
+
+**Command (per file):**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/<file>.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Results (all clean halts, no crashes/timeouts):**
+
+| File | Punch output (before fix) | Punch output (after fix) |
+|---|---|---|
+| `simple1.ipl` | `A1 01 30000` | `A1 01 3` |
+| `simple2.ipl` | `A1 01 70000`, `A2 01 50000` | `A1 01 7`, `A2 01 5` |
+| `simple3.ipl` | `A1 01 70000`, `A2 01 50000` | `A1 01 7`, `A2 01 5` |
+| `simple4.ipl` | `A1 01 70000→70001`, `A2 01 50000→50001` | `A1 01 7→8`, `A2 01 5→6` |
+| `simple5.ipl` | `A1 01 70000→70001`, `A2 01 50000→50001` | `A1 01 7→8`, `A2 01 5→6` |
+
+Every value now reads as the plain, intended integer, and both `J125`
+increments (`simple4`/`simple5`) are now correctly `+1` in the ordinary
+sense (`7→8`, `5→6`) rather than the field-mismatched `70000→70001`
+pattern. `simple4.ipl` and `simple5.ipl` are now content-identical to the
+already-fixed `simple6.ipl` (their only prior difference — a 2-column
+shift in the constant's position — no longer matters now that both sit
+correctly right-justified at column 60).
+
+**Analysis:** No new findings beyond confirming the `simple6.ipl` fix
+generalizes cleanly across every existing test in the family. This
+retroactively invalidates the "x10000 encoding" framing used in every
+`simple1`-`simple5` log entry above (all logged before this fix) — those
+entries are left as-is per instruction (no flipping old entries), but
+should be read with this correction in mind: there was no encoding, just
+a left-justification bug in the source cards. The `hold_2.ipl`-
+`hold_8.ipl` files (set aside from the prior session, not part of the
+active `simple*.ipl` series) were **not** fixed or re-run here.
+
+## 2026-09-11 22:15 PDT — `simple6.ipl` — CONFIRMED: the "x10000" field was our own left-justification bug
+
+**Jeff's hypothesis, stated after `simple5.ipl`:** "I think we're putting
+in the numbers in the wrong format." Specifically: the `CONSTANT` cards'
+value digit has been left-justified in the LINK field, when it should be
+right-justified.
+
+**Supporting fact found before testing:** `IPL-V-Interpreter-Mod-3-4.sps`
+line 1562 declares `LINK  DS  5,` — LINK genuinely is a fixed 5-digit
+storage field, matching the 5-digit values (`70000`, `50000`, etc.) seen
+in every punch dump so far.
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple6.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Program:** Identical to `simple4.ipl`/`simple5.ipl` except the
+`CONSTANT` cards' value digit moved 4 columns right, from column 56 to
+column 60 (the last column of the presumed 56-60 LINK field):
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            3
+                                        5       0
+      START A0 GET SYMB A1                A0    10A1
+      PRINT RESULT, QUIT.                         J152
+      INCREMENT IT                                J125
+      PRINT RESULT, QUIT.                         J152
+      GET SYMB A2                               10A2
+      PRINT RESULT, QUIT.                         J152
+      INCREMENT IT                                J125
+      PRINT RESULT, QUIT.                         J152  0
+                                        5       01
+      CONSTANT 7                          A1    01          7
+      CONSTANT 5                          A2    01          5
+      START AT A0                       5         A0
+```
+
+**Expected:** If the hypothesis is right, the punch dump should show
+plain `7`/`5` (not `70000`/`50000`), and `J125` should correctly bump them
+to `8`/`6` (not `70001`/`50001`).
+
+**Actual:**
+- Card punch (4 cards punched): `A1 01 7`, `A1 01 8`, `A2 01 5`,
+  `A2 01 6`.
+- Typewriter: `THE END                     8`.
+- Completed cleanly, no crash, no timeout.
+
+**Analysis — this resolves the single biggest open question from the
+2026-09-10 session:**
+- **Confirmed correct.** Right-justifying the constant's digit within the
+  5-column LINK field produces exactly the right values: `A1` goes
+  7→8, `A2` goes 5→6. `J125` was never broken and was never operating on
+  "the wrong field" — it was always correctly incrementing the LINK
+  field's units digit; **our own hand-written `.ipl` cards had been
+  putting the digit in the field's leftmost (ten-thousands) column
+  instead of its rightmost (units) column**, with the blank trailing
+  columns reading as zero. `70000`→`70001` was IPL-V doing exactly the
+  right thing to a badly-formatted operand.
+- **This also retroactively reframes the prior session's `simple8.ipl`
+  result** (traced `J110` add: `30000`+`40000`→`70000`, at the time
+  reported as "confirmed correct 3+4=7 in a value x10000 encoding").
+  There is no "x10000 encoding" — that was the same left-justification
+  artifact. The arithmetic was genuinely correct (30000+40000=70000 is
+  simple correct integer addition), just performed on operands we had
+  accidentally scaled up by 10000x through bad card formatting, not on
+  the intended small operands 3 and 4.
+- **Practical rule for all `simple*.ipl` cards going forward:** a data
+  term's numeric value must be right-justified within its (apparently
+  5-column) field, e.g. a single-digit value's digit belongs in the
+  field's *last* column, not its first. `simple1.ipl` through `simple5.ipl`
+  (and presumably `hold_2.ipl`-`hold_8.ipl` from the prior session) all
+  used the wrong (left-justified) placement.
+
+## 2026-09-11 22:13 PDT — `simple5.ipl` (Jeff's hypothesis: `CONSTANT` value column position)
+
+**Command:**
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple5.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+
+**Program:** Identical to `simple4.ipl` except the `CONSTANT` cards' value
+column shifted 2 columns left:
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            3
+                                        5       0
+      START A0 GET SYMB A1                A0    10A1
+      PRINT RESULT, QUIT.                         J152
+      INCREMENT IT                                J125
+      PRINT RESULT, QUIT.                         J152
+      GET SYMB A2                               10A2
+      PRINT RESULT, QUIT.                         J152
+      INCREMENT IT                                J125
+      PRINT RESULT, QUIT.                         J152  0
+                                        5       01
+      CONSTANT 7                          A1    01    7
+      CONSTANT 5                          A2    01    5
+      START AT A0                       5         A0
+```
+(vs. `simple4.ipl`'s `CONSTANT 7                          A1    01      7`
+— the trailing `7`/`5` moved 2 columns earlier.)
+
+**Expected:** Jeff's hypothesis (not yet stated to me in detail — flagged
+here for follow-up) was that shifting the `CONSTANT` value's column
+position might interact with the `J125` field-mismatch mystery
+(`simple4.ipl` showed `J125` bumping `70000`→`70001` instead of the
+expected `70000`→`80000`).
+
+**Actual:** Byte-for-byte identical to `simple4.ipl`'s run: card punch
+`A1 01 70000`, `A1 01 70001`, `A2 01 50000`, `A2 01 50001`; typewriter
+`THE END 8`; clean halt.
+
+**Analysis:** The 2-column shift made no observable difference — same
+punch output, same `J125` behavior (still incrementing the trailing digit
+rather than the leading "value" field). Whatever encodes a `CONSTANT`
+card's value, it isn't sensitive to this particular column shift (at
+least not in a way this test could detect). Follow-up needed: get the
+actual hypothesis from Jeff to determine whether this genuinely tests it
+or whether a different column/field needs to move instead.
+
 ## 2026-09-11 22:05 PDT — Harness change: disabled real-time throttling
 
 Not a `simple*.ipl` experiment — a change to `tools/cli/run1620.mjs`
