@@ -11,6 +11,129 @@ oldest-first order; from the next entry on, newest entries go at the
 
 ---
 
+## 2026-09-12 (afternoon) — `simple11.ipl`: isolating `J62` (the "locate" half of `J66`), and a real logging lapse
+
+Continuing the `F1.ipl`/`RESBLK` thread: since `IPL-V-Interpreter-Mod-3-4.sps`
+shows `J66` is just a dispatcher that calls `J62` ("LOCATE (0) ON (1)",
+line 1990) and, only if not found, `J64` (the actual list-insert), the
+plan was to test each in isolation to find out which one is the real
+`RESBLK`-crashing culprit.
+
+**First version (mine):** took `simple10.ipl` and changed only the
+`J66`->`J62` token (byte-identical everywhere else, diff-verified).
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-1.card \
+  software/IPL-V/simple/simple11.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/Mod-3-4/IPL-V-Interpreter-Mod-3-4-Deck-2.card \
+  --timeout 30000
+```
+**Actual:** clean halt, no crash. One card punched (`14723 0400000`, the
+still-empty output list's header, since a pure locate doesn't add
+anything). Full switches trace saved at `traces/simple11_monitor.log`.
+**Analysis at the time:** J62 alone doesn't crash -> points at J64.
+
+**Mistake (mine), corrected by Jeff:** immediately tried the same
+`J66`->`J64` substitution for a would-be `simple12.ipl`, using the exact
+same surrounding setup (`INPUT SYMBOL`/`INPUT LIST NAME`/`REVERSE` via
+`J6`) that had worked for calling `J66` itself. Jeff caught this before it
+ran: `JJ66`'s own code does extra setup (`BTM PSHDN,H0` / `CF D6-4` /
+`TF H0-5,D6`) immediately before jumping into `J64` -- calling `J64`
+directly the same way `J66` is called does not replicate what `J64`
+actually expects as input. That file was deleted at Jeff's request; he
+built his own `simple12.ipl` instead (in progress, not yet in this log).
+
+**Then Jeff overwrote `simple11.ipl` with his own version** (correctly
+so, per the plan -- he's driving this thread now), to test `J62` with a
+much simpler setup: a statically-built `L1->L2->L3->L4` list (no `J90`/
+`RESBLK` involved in building it), pushing `L1` then `L3` via two
+`GET SYMB` calls, then calling bare `J62` (no `REVERSE`/`J6` step, no
+`H0`/`W0` split), then `J152` to print/quit:
+```
+      SIMPLE TEST FOR IPL-V             9
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      START A0 GET SYMB L1                A0    10L1
+      WE WILL FIND L3                           10L3
+      FIND IT                                   J62
+      PRINT THE LIST, QUIT.                     J152  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      THE LIST L1.                        L1      0
+                                                  L2
+                                                  L3
+                                                  L4    0
+      START AT A0                       5         A0
+```
+(One intermediate version had a typo -- `J152`'s column shifted slightly
+-- fixed by Jeff; both versions gave the identical result below.)
+
+**Actual (both versions):** clean halt, **no `MAR Check` crash**, but a
+different failure: `OP CODE` error at address 19055 (where the bare
+`J62` card sits), zero cards punched, before ever reaching `J152`.
+```
+Loaded 729 card(s) from 4 file(s).
+    1 19055          OP CODE                     3
+    1 19055          THE END                     3
+```
+
+**Analysis (wrong, in real time):** I guessed, in order, two incorrect
+explanations before getting to the real one -- worth recording both as
+what NOT to trust, not just the eventual right answer:
+
+1. A stack-order/calling-convention mismatch (missing the `REVERSE`/`J6`
+   setup). Wrong -- Jeff called this out directly.
+2. A "clustered subroutine loading" theory: comparing this run's
+   switches-trace subroutine table against the earlier working `J62` call
+   (`traces/simple11_monitor.log`), the working run's table showed
+   `4 J 060`, `4 J 062`, `4 J 064` all present, while this run's table
+   showed only `4 J 010`, `4 J 064`, `4 J 170` -- no `J62` line. I
+   concluded J62's code must not have been loaded at all, and that J60/
+   J62/J64 load as a cluster triggered by referencing J60. Also wrong,
+   and Jeff was right to reject it outright ("J62 can be called
+   anytime") -- `IPL-V-Subroutines.card` is a fixed 80-line deck loaded
+   in full, unconditionally, every single run (confirmed by reading the
+   file directly); there is no selective/clustered loading mechanism.
+   Whatever that subroutine-table trace section actually reflects, it
+   is not "which primitive code is resident in memory."
+
+**Actual cause (confirmed):** a plain column-alignment error on the
+card itself, nothing to do with loading or calling convention. The `J62`
+token was punched starting at column 48 (`FIND IT ... J62`) instead of
+column 50. Column 48 is correct only when a 2-digit numeric op-code
+prefix occupies columns 48-49 immediately before the symb value (as in
+`10L1`/`10L3` on the two preceding lines, or `00J110` elsewhere in the
+series) -- a bare `Jnn` primitive name with no such prefix belongs
+starting at column 50 (matching every other successful bare-primitive
+call in this whole series: `J66`, `J151`, `F1`, etc.). Shifting `J62`
+two columns right (line 7's card now reads
+`      FIND IT                                     J62`, `J62` at
+column 50) fixed it completely:
+```
+Loaded 729 card(s) from 4 file(s).
+             0419091
+
+   0 19067           THE END                     4
+```
+Clean halt, no `OP CODE` error, one card punched (`0419091`), confirming
+`J62` itself executed successfully once the card was punched correctly.
+Trace saved at `traces/simple11_colfix.log`.
+
+**Lesson:** don't theorize about interpreter-internal mechanisms (loader
+behavior, calling conventions) from trace output alone when a much more
+mundane explanation -- a column off by two -- fits the evidence just as
+well and should be checked first. Both wrong theories above were
+disproven by direct verification (reading `IPL-V-Subroutines.card`,
+and simply re-checking the card's own columns) that should have been the
+first move, not the second and third.
+
+**Process note:** I stopped adding log entries after the `simple10.ipl`
+entry below and only resumed here after Jeff pointed it out -- a real
+gap, not a deliberate change in logging policy.
+
+---
+
 ## 2026-09-11 23:30 PDT — `simple10.ipl` (new: minimal reproduction of the still-open `F1.ipl` crash)
 
 Starts a new thread of experiments (rather than one-off `F1.ipl`
