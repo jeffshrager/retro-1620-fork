@@ -1,0 +1,185 @@
+Jeff,
+
+Our exchanges with Dave over the past couple of days have reminded me
+that I did a little more work last month on studying the behavior of
+Ackermann in the 1620 version of IPL-V, then got distracted and never
+followed up with you on it.
+
+First, you did send me a very simple IPL-V program, simple.ipl, which
+I've tried, and which runs just fine. It also doesn't manipulate any
+lists. What I was looking for was something a little more complex, but
+without the hoary recursion of Ackermann.
+
+Where I left this last time, as discussed in the quote below, was that
+Ackermann(m, n) worked fine for all of the cases I've tried with n=0.
+I've tried values of m up to 1000, although I'm not sure the output is
+correct (or maybe I just don't understand what it's saying). Any test
+with n>0 eventually starts printing "TRAPPED ON H2" messages endlessly
+on the typewriter, which I suspect indicates the program is out of
+available space.
+
+A couple of weeks ago I decided to turn on the IPL-V tracing mechanism
+(not the emulator instruction trace) to see if I could understand where
+Ackermann(1, 1) was running off the rails. The result of that is
+attached and discussed below.
+
+IPL-V tracing seems to be controlled by the Program Switches on the 1620
+control panel. I've tried various combinations of the switches, and my
+current best guess is that they have the following functions:
+
+  * Switch 1 -- When on, enables tracing. Apparently tracing also needs
+    to be specified in the Q digit of an instruction. With Switch 1 off,
+    that tracing appears to be disabled. Turning Switch 1 on outputs the
+    trace to the card punch.
+  * Switch 2 -- When on, also appears to enable tracing, but with this
+    switch, I get a little bit more output. My guess is that this
+    enables global tracing whether it's specified for any instructions
+    or not.
+  * Switch 3 -- When on, this appears to output something like a symbol
+    table plus linkage information for the J-subroutines as they are
+    selected and loaded into memory.
+  * Switch 4 -- When on, this outputs the IPL-V source statements to the
+    card punch with some addition data in the rightmost columns of the
+    card. It looks to me as if this the "object code" assembled from
+    each cell definition.
+
+As far as I can tell, the switches operate independently and do not
+affect the behavior of the other switches.
+
+I started looking at the IPL-V tracing by modifying the Ackermann.ipl
+source to have m=1, n=0, loaded the decks in sequence (object deck 1,
+source file, subroutines file, object deck 2), and turned on all four
+Program Switches. As Ackermann loaded, the card punch started logging
+trace lines, but once the load finished and the assembled program began
+to run, pretty quickly stopped with a Punch Check indicator. Punch
+checks in the emulator are caused by sending invalid alphanumeric
+digit-pair codes to the punch, which print as "?". You can reset the
+check condition and continue, but I kept getting punch checks on almost
+all of the lines output.
+
+I took a memory dump, found the punch buffer in memory, and saw that,
+indeed, the memory locations corresponding to the "?"s in the output did
+have invalid alphanumeric codes. Finding out why that was happening took
+me down quite a rabbit hole, tracing the 1620 instructions that
+formatted those fields in the buffer, and eventually doing some
+JavaScript-level tracing of those instruction implementation in the
+emulator.
+
+The problem turned out to be the result of a TNF (Transfer Numeric Fill,
+op code 72). This instruction translates a field of numeric digits from
+BCD to the 1620 two-digit alphanumeric codes. Basically it transfers the
+digits from one field to another, interleaving each BCD digit from the
+source with a 7 in the destination field. If the first (high-address)
+digit in the field has a flag indicating a negative value, a 5 is
+inserted instead of a 7. If you look at a 1620 code chart, 7n codes are
+the decimal digit characters, while 5n codes are the letters J-R, which
+is the old punched-card convention for signed digits. A flagged 0
+doesn't actually have a character glyph assigned, but prints as a - on a
+407 tabulator. The emulator uses "]" for that code.
+
+The problem is, the 1620 Model 2 requires that the alphanumeric field
+written by a TNF instruction be at an odd address. Alas, there were many
+TNFs in the program that had an even address as their P operand. For an
+example, see the TNF at card sequence 25670 in the U. Oregon IPL-V listing.
+
+At first, I thought this might be a Model 1 vs Model 2 issue (Oregon
+having had a 1620 Model 1), but the documentation for the Model 1 also
+says that the P operand for a TNF must have an odd address. Apparently
+you could get away with using an even address on some variants of the
+Model 1, but not at all on the Model 2.
+
+I stewed on this a while, trying to figure out how to deal with it. On a
+whim, I decided to look at the two update documents that Rupert had
+found in late June, and sure enough, Modification Letter Number 4
+<https://purl.stanford.edu/qg281jn8061> addresses this very issue. There
+is also a Modification Letter Number 3
+<https://purl.stanford.edu/bk072pk3345> that has a few other changes, so
+I decided to apply both of those and see what happened. I was a little
+leery of doing this without having letters 1 and 2 as well, but there's
+no way to know what problems that may have caused without having those
+letters.
+
+The short answer is that, other than fixing the punch checks, it made no
+difference in the way the program worked. I still can't get Ackermann(m,
+n) to finish cleanly when n>0. I did, however, get IPL-V traces for
+Ackermann(1, 0) and Ackermann(1, 1). As far as I can tell from those
+traces, things start to go wrong as soon as the recursion for the n
+parameter begins.
+
+At this point, the only thing I can think to do is to start tracing the
+flow of the program in detail and try to figure out what isn't working.
+I can't rule out an emulator bug, a Model 1 vs Model 2 incompatibility,
+or an issue with the OCR of the program listing. My suspicion, though,
+is that it's a bug in the 1620 code.
+
+I'm sorry to say that I'm about burned out on this program, and have no
+appetite for pursuing further debugging of this program, which I suspect
+would be a big effort. It's been interesting trying to get this old
+program to run and figuring out how to structure the load deck, but I'm
+actually not interested in IPL-V itself, historically significant as it
+may be. I also have doubts about the viability of the Oregon 1620
+implementation even if the problem with Ackermann can be resolved,
+especially with respect to your end goal of getting it to run LT.
+
+I'm certainly willing, however, to continue consulting with you on this
+and providing what 1620 expertise I have. You mentioned in your email
+below that you could use some 1620 debugging guidance in the form of a
+video or a Zoom session. I can certainly try to provide that. I think a
+Zoom session (more likely a series of them) would be the better
+approach. I'd suggest that we start with a generic debugging tutorial,
+let you try doing some of that on your own, and then zero in on any
+specific questions or issues that exercise uncovers.
+
+I have made a few improvements recently to the new tracing feature in
+the retro-1620 emulator and released that as v1.01. The changes have
+been committed to the GitHub repo
+<https://github.com/pkimpel/retro-1620> and uploaded to the hosting site
+<https://www.phkimpel.us/IBM-1620/>. The project wiki
+<https://github.com/pkimpel/retro-1620/wiki/UsingTheControlPanel#trace-instruction-execution>
+now has basic documentation on the new trace facility.
+
+I have /not/ committed the changes for Modification Letters 3 & 4 to the
+software/ directory of the repo, however. I can do that, but would like
+to hold off for a while. If you'd like me to do so, I would prefer to
+commit it to a separate sub-directory in the repo.
+
+Instead, I have attached a zip archive containing the following files
+that incorporate those changes:
+
+  * IPL-V-Interpreter-Mod-3-4.sps
+    The updated SPS assembler source with Letters 3 & 4 applied.
+  * IPL-V-Interpreter-Mod-3-4-Listing.lst
+    An assembly listing of updated source.
+  * IPL-V-Interpreter-Mod-3-4-Object-UNCOMPRESSED.card
+    The uncompressed object code deck generated by the SPS assembler.
+    The uncompressed deck embeds the SPS source code and was used to
+    generate the assembly listing using a utility script that can be
+    found in the repo
+    <https://github.com/pkimpel/retro-1620/blob/main/software/retro-1620-Utilities/SPS-Object-Deck-Lister-LHCode.wsf>.
+    Alas, it's a Windows Scripting VBScript file. Those have been
+    deprecated for years, but they still run under Windows 11. (I'm
+    currently studying Python so I can eventually rewrite my VBScript
+    utilities using something that has a future).
+  * IPL-V-Interpreter-Mod-3-4-Object.card
+    The compressed object code deck generated by the SPS assembler. This
+    was used to generate the Deck-1 and Deck-2 files mentioned next.
+  * IPL-V-Interpreter-Mod-3-4-Deck-1.card
+    The object deck for the IPL-V assembler/loader portion of the program.
+  * IPL-V-Interpreter-Mod-3-4-Deck-2.card
+    The object deck for the IPL-V interpreter portion of the program.
+  * Ackermann-TEST.ipl
+    The source code for the Ackermann(1, 1) test program.
+  * IPL-V-Punch-Trace-Ack-1-0-20260823.txt
+    Trace output from running Ackermann(1, 0) with all four Program
+    Switches in the ON position.
+  * IPL-V-Punch-Trace-Ack-1-1-20260823.txt
+    Trace output from running Ackermann(1, 1) with all four Program
+    Switches in the ON position (terminated after it was clearly running
+    off the rails).
+  * Ackermann-1-0-vs-1-1-Trace-20260823.pdf
+    Side-by-side comparison of the two traces.
+
+With these files and the latest version of the emulator, you should be
+able to reproduce what I've done. I haven't included the
+IPL-V-Subroutines.card file, which hasn't changed, and is available in
+the repo
