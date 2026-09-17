@@ -11,6 +11,161 @@ oldest-first order; from the next entry on, newest entries go at the
 
 ---
 
+## 2026-09-16 — `simple15.ipl`: `J66` insert confirmed again; `J76` has no dispatch-table entry at all
+
+```
+      TEST NON-BUILT-IN-JFNS            9
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            10
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      START A0 GET SYMB L1                A0    10L1
+      PRINT THE LIST                              J151
+      GET SYMB L1                               10L1
+      GET L5                                    10L5
+      FIND OR INSERT                              J66
+      PRINT OUT THE LIST NOW                    10L1
+      PRINT THE LIST                              J151
+      GET SYMB L1                               10L1
+      GET L7                                    10L7
+      J76 INSERT LIST (0) AFTER (1)               J76
+      GET SYMB L1                               10L1
+      PRINT THE LIST, QUIT.                       J151  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      THE LIST L1.                        L1      0
+                                                  L2
+                                                  L3
+                                                  L4    0
+      THE LIST L6.                        L6      0
+                                                  L7
+                                                  L8
+                                                  L9    0
+      START AT A0                       5         A0
+```
+
+Run against the original, unpatched interpreter deck (the one confirmed
+clean for `F1.ipl`):
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/IPL-V-Interpreter-Deck-1.card \
+  software/IPL-V/simple/simple15.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/IPL-V-Interpreter-Deck-2.card \
+  --timeout 30000
+```
+
+**Actual:** clean halt, no crash. Trace saved at `traces/simple15_plain.log`.
+Three list prints:
+1. `L1,L2,L3,L4` -- correct initial list.
+2. After `GET SYMB L1`, `GET SYMB L5`, `J66`: `L1,L2,L3,L4,L5` -- `J66`
+   correctly found `L5` absent and inserted it. Consistent with the
+   Mod-3-4-regression finding above (`J66` works fine on the *unpatched*
+   interpreter).
+3. After `GET SYMB L1`, `GET SYMB L7`, `J76`: **identical to print 2**,
+   still `L1,L2,L3,L4,L5`. No `L7`/`L8`/`L9` appear anywhere, no sublist
+   got spliced in -- `J76` had no observable effect.
+
+**Checked why -- first pass, WRONG:** grepped only the hardwired-primitive
+dispatch table (`51 <Jnum>,<len>` entries) in
+`software/IPL-V/IPL-V-Interpreter.sps` and, finding no `51 76,...` entry
+and no `JJ76` label, concluded `J76` was never assembled into this
+interpreter at all. **Jeff caught this directly** ("Isn't J76 in the
+additional J functions loaded with the code?") -- I had forgotten to
+check `IPL-V-Subroutines.card`, a *second* class of routine in this
+interpreter: library routines written in IPL-V itself (ordinary
+`ROUTINE HEADER` cards, bundled under a `SYSTEM SUBROUTINE HEADER CARD`
+and loaded/registered into the routine directory dynamically at runtime,
+same mechanism a user program's own routines use) as opposed to
+hardwired primitives assembled straight into the interpreter. `J76` **is**
+defined there, line 43:
+```
+J76 40H0       J75      J6       J72    40H0       J60      J6       J9    |1042
+```
+a real composite routine (calls `J75`, `J6`, `J72` -- `J72` itself another
+subroutine-card routine, line 46 -- then `J60`, `J6`, `J9`). Not missing.
+
+**Corrected open question:** `simple15.ipl`'s null result for `J76` is
+therefore *not* explained by "J76 doesn't exist." Either the
+stack/argument order `simple15.ipl` used (`GET SYMB L1` then
+`GET SYMB L7`, per the test's own "INSERT LIST (0) AFTER (1)" comment)
+doesn't match what this composite routine actually expects, or there's a
+real bug in `J76`/`J72`'s logic. Not yet traced further -- genuinely
+open, not a "this primitive is a stub" dead end as first (wrongly)
+reported.
+
+**Resolved -- it was the argument, not a bug.** Jeff: "I think I called
+it with the wrong argument L7 when I meant L6." Fixed `simple15.ipl` to
+push `GET SYMB L6` (the actual head of the `L6,L7,L8,L9` sublist) instead
+of `L7`, then reran unchanged otherwise:
+```
+node tools/cli/run1620.mjs \
+  software/IPL-V/IPL-V-Interpreter-Deck-1.card \
+  software/IPL-V/simple/simple15.ipl \
+  software/IPL-V/IPL-V-Subroutines.card \
+  software/IPL-V/IPL-V-Interpreter-Deck-2.card \
+  --timeout 30000
+```
+**Actual:** clean halt, no crash. Trace saved at
+`traces/simple15_L6_plain.log`. Third print: `L1,L7,L8,L9,L2,L3,L4,L5` --
+the `L6` sublist (`L7,L8,L9`) correctly spliced in right after `L1`,
+confirming `J76` really does "insert list (0) after (1)" as advertised.
+`J76`/`J72` are both working correctly; the earlier null result was
+entirely the `L7`-vs-`L6` argument mistake, not an interpreter bug.
+
+**Full call chain, internal vs. loaded.** Reran with `--switches
+1,2,3,4` to get IPL-V's own load-time assembly listing (Switch 4), saved
+at `traces/simple15_L6_switches.log`, and cross-referenced every `Jnn`
+token against `IPL-V-Interpreter.sps`'s hardwired dispatch tables (`05
+JJn,0,0,` / `51 n,len`). "Internal" = has a table entry there (hand-
+assembled into the interpreter binary); "loaded" = no table entry, but
+gets its own address/header row in the runtime assembly listing when
+`IPL-V-Subroutines.card`'s `SYSTEM SUBROUTINE HEADER CARD` batch loads
+(an ordinary IPL-V routine resident in list space, same routine-directory
+dispatch as user code). Bare `Jnn` tokens (no numeric op prefix) are
+calls; tokens like `40H0`/`11W0`/`70J8` are op+register instructions, not
+calls.
+
+```
+J76 (LOADED)
+├─ J75  (internal)
+├─ J6   (internal)
+├─ J72  (LOADED)
+│   ├─ J101 (LOADED)
+│   │   ├─ J17  (internal)
+│   │   ├─ J90  (internal)
+│   │   ├─ J22  (LOADED)
+│   │   │   └─ J21 (LOADED)
+│   │   │       └─ J20 (internal)  <- bottoms out
+│   │   ├─ J4, J60 (internal, dup)
+│   │   ├─ J18  (internal)
+│   │   ├─ J80  (internal, x3)
+│   │   ├─ J133 (internal, x2)
+│   │   ├─ J131, J132, J137, J71, J19 (internal)
+│   │   └─ J9   (internal, dup)
+│   ├─ J75, J9 (internal, dup)
+├─ J60, J9, J50, J193, J197, J61, J4, J30 (all internal)
+```
+
+The loaded layer is only 4 deep (`J76 -> J72 -> J101 -> J22 -> J21`) and
+every branch terminates cleanly in an internal primitive -- no dangling
+or unresolved reference anywhere in the chain. A clean, fully-verified
+worked example of the loaded/internal boundary functioning exactly as
+designed.
+
+**Why this matters:** `J76` and `J72` are not hardwired-assembly
+primitives -- they're ordinary IPL-V routines, loaded from
+`IPL-V-Subroutines.card`'s `SYSTEM SUBROUTINE HEADER CARD` batch via the
+same generic `ROUTINE HEADER`/routine-directory mechanism a user program
+uses for its own routines (see the corrected-mistake note above). This is
+the **first confirmed proof point that loaded (not hand-assembled) IPL-V
+routines execute correctly end-to-end** through this interpreter --
+composite routine calls (`J76` -> `J75`, `J6`, `J72` -> more primitives),
+correct list-splice semantics, no crash. Since Logic Theorist-scale
+programs will lean heavily on library/loaded routines rather than
+hand-assembled primitives, this is a meaningful threshold result, not
+just one more passing test.
+
+---
+
 ## 2026-09-12 (evening, later) — `F1.ipl` itself confirmed fixed by dropping the Mod-3-4 patch
 
 Direct follow-up to the root-cause finding below: reran `notes/F1.ipl`
