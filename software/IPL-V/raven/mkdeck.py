@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tokenize the first N lines of raven.txt and emit raven3.ipl (+ raven3.vocab).
-usage: mkdeck.py [nlines=2] [steps=40] [--table]   (writes raven4.ipl)
-Words -> regional symbols T1..Tn (first-seen order); the text is a data list T39;
+usage: mkdeck.py [nlines=12] [steps=100] [--lspace=900] [--no-table]   (writes raven4.ipl)
+Words -> regional symbols T1..Tn (first-seen order); the text is a data list X1;
 each word gets an empty successor list named by its own symbol. The IPL-V
 program trains (appends each word to its predecessor's list) and generates.
 Long explanations go on TYPE-1 comment cards (text in cols 7-40, '1' in col 41)."""
@@ -24,15 +24,16 @@ def const(comment, name, value):            # integer data term, value right-jus
     return "".join(s).rstrip()
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
-table = "--table" in sys.argv
-nlines = int(args[0]) if len(args) > 0 else 2
-steps = int(args[1]) if len(args) > 1 else 40
+table = "--no-table" not in sys.argv
+lspace = int(([a.split("=")[1] for a in sys.argv if a.startswith("--lspace=")] or ["900"])[0])
+nlines = int(args[0]) if len(args) > 0 else 12
+steps = int(args[1]) if len(args) > 1 else 100
 lines = [l for l in open("raven.txt", encoding="utf-8").read().split("\n") if l.strip()][:nlines]
 words = re.findall(r"[a-z']+", " ".join(lines).lower())
 vocab = {}
 for w in words: vocab.setdefault(w, "T%d" % (len(vocab) + 1))
 text = [vocab[w] for w in words]
-assert len(vocab) < 37
+assert len(vocab) < 300
 abbr, used = {}, set()                       # 4-letter stand-in for each word, unique
 for w in vocab:
     a = re.sub(r"[^a-z]", "", w)[:4].upper()
@@ -60,39 +61,40 @@ C("BIGRAM MARKOV TEXT GENERATOR USING DESCRIPTION LISTS.",
   "TEXT: FIRST %d LINES OF THE RAVEN, %d TOKENS, %d DISTINCT WORDS (SEE RAVEN4.VOCAB)." % (nlines, len(words), len(vocab)),
   "EVERY WORD IS A REGIONAL SYMBOL T1..T%d, AND IS ALSO A DESCRIBABLE LIST (A HEAD CELL, INITIALLY EMPTY)." % len(vocab),
   "A WORD'S DESCRIPTION LIST HOLDS ITS SUCCESSORS: EACH ATTRIBUTE IS A WORD THAT FOLLOWED IT IN THE TEXT, AND ITS VALUE IS AN INTEGER DATA TERM COUNTING HOW OFTEN. ONLY SUCCESSORS ACTUALLY SEEN ARE STORED, SO THE TABLE IS SPARSE.",
-  "EACH WORD SYMBOL Tn ALSO HAS ATTRIBUTE K1 WHOSE VALUE IS A 4-LETTER ALPHANUMERIC DATA TERM Vn (E.G. ONCE) SO THAT OUTPUT SHOWS THE WORD. J16 IGNORES IT BECAUSE IT ONLY WEIGHS NUMERIC VALUES.",
-  "PHASE 0 (LABEL): ATTACH THE TEXT TERMS. PHASE 1 (TRAIN): FOR EACH ADJACENT PAIR (PREV, THIS) OF THE TEXT LIST T39, ADD 1 TO THE COUNT OF THIS IN PREV'S DESCRIPTION LIST, CREATING IT WITH COUNT 1 IF IT IS NEW (ROUTINE G2).",
+  "TEXT FOR OUTPUT: EACH WORD SYMBOL Tn HAS A 4-LETTER ALPHANUMERIC DATA TERM Vn (E.G. ONCE). THE MAP Tn -> Vn IS THE DESCRIPTION LIST OF ONE SEPARATE DESCRIBABLE LIST X4 (ATTRIBUTE Tn, VALUE Vn). IT IS KEPT OUT OF THE SUCCESSOR LISTS BECAUSE J16 TRAPS ON NON-NUMERIC VALUES.",
+  "PHASE 0 (LABEL): ATTACH THE TEXT TERMS. PHASE 1 (TRAIN): FOR EACH ADJACENT PAIR (PREV, THIS) OF THE TEXT LIST X1, ADD 1 TO THE COUNT OF THIS IN PREV'S DESCRIPTION LIST, CREATING IT WITH COUNT 1 IF IT IS NEW (ROUTINE G2).",
   "PHASE 2 (GENERATE): REPEAT N TIMES: J16 PICKS A SUCCESSOR OF THE CURRENT WORD AT RANDOM, WEIGHTED BY THE COUNTS (ROUTINE G1).",
   "WORKING CELLS (W0-W2 ARE AVOIDED: J11 AND OTHER LIBRARY ROUTINES OVERWRITE THEM): W9 CURRENT WORD, W4 PREVIOUS WORD, W6 CURRENT TEXT CELL, W5 THIS WORD, W7 FIRST WORD, W8 STEP COUNTER.")
 L += [card("DEFINE REGIONS", typ="2", name="A0", link="2"),
-      card("LIST REGION", typ="2", name="L0", link="300"),
-      card("TOKEN REGION", typ="2", name="T0", link="40"),
+      card("LIST REGION", typ="2", name="L0", link=str(lspace)),
+      card("TOKEN REGION", typ="2", name="T0", link=str(len(vocab) + 2)),
+      card("SUPPORT LIST REGION", typ="2", name="X0", link="6"),
       card("ROUTINE REGION", typ="2", name="G0", link="4"),
       card("NUMBER REGION", typ="2", name="N0", link="4"),
-      card("WORD-TEXT REGION", typ="2", name="V0", link="40"),
-      card("ATTRIBUTE KEY REGION", typ="2", name="K0", link="2")]
-C("REGION L0 SUPPLIES CELLS FOR THE PUSHDOWN STACK AND FOR THE DESCRIPTION LISTS AND COUNTS BUILT DURING TRAINING.")
+      card("WORD-TEXT REGION", typ="2", name="V0", link=str(len(vocab) + 2)),
+      card("ATTRIBUTE KEY REGION", typ="2", name="K0", link="3")]
+C("SIZES: T0/V0 = VOCABULARY + 2. X0 HOLDS THE THREE SUPPORT LISTS X1 (TEXT), X2 (WORDS), X3 (TEXT TERMS). X4 IS THE WORD -> TEXT MAP, K2 A TABLE SEPARATOR MARK.",
+  "REGION L0 SUPPLIES CELLS FOR THE PUSHDOWN STACK AND FOR THE DESCRIPTION LISTS AND COUNTS BUILT DURING TRAINING.")
 L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
 
 C("--- MAIN PROGRAM A0 ---")
-C("--- MAIN PROGRAM A0 ---" if False else "PHASE 0: LABEL THE WORDS. LIST T38 HOLDS THE WORD SYMBOLS T1..T%d AND LIST T37 THE MATCHING TEXT TERMS V1..V%d IN THE SAME ORDER. WALK BOTH IN STEP AND DO J11: ASSIGN (1) AS VALUE OF ATTRIBUTE (0) OF LIST (2), I.E. PUSH THE WORD, THEN ITS TEXT TERM, THEN THE KEY K1." % (len(vocab), len(vocab)))
-I("10", "T38", "A0", c="PUSH WORD LIST T38")
+C("--- MAIN PROGRAM A0 ---" if False else "PHASE 0: BUILD THE TEXT MAP. LIST X2 HOLDS THE WORD SYMBOLS T1..T%d AND LIST X3 THE MATCHING TEXT TERMS V1..V%d IN THE SAME ORDER. WALK BOTH IN STEP AND DO J11 ON LIST X4: ASSIGN (1) AS VALUE OF ATTRIBUTE (0) OF LIST (2), I.E. PUSH X4, THEN THE TEXT TERM, THEN THE ATTRIBUTE." % (len(vocab), len(vocab)))
+I("10", "X2", "A0", c="PUSH WORD LIST X2")
 I(symb="J60", c="J60: (0) = FIRST WORD CELL")
 I("20", "W3", c="W3 = WORD CELL; POP")
-I("10", "T37"); I(symb="J60", c="(0) = FIRST TEXT-TERM CELL")
+I("10", "X3"); I(symb="J60", c="(0) = FIRST TEXT-TERM CELL")
 I("20", "W6", c="W6 = TEXT CELL; POP")
-I("11", "W3", "9-4", c="LABEL LOOP: PUSH WORD CELL")
-I(symb="J80", c="(0) = WORD SYMBOL (LIST (2))")
+I("10", "X4", "9-4", c="MAP LOOP: PUSH MAP LIST X4 = (2)")
 I("11", "W6"); I(symb="J80", c="(0) = TEXT TERM (VALUE (1))")
-I("10", "K1", c="PUSH KEY K1 (ATTRIBUTE (0))")
-I(symb="J11", c="J11: WORD[K1] = TEXT TERM")
+I("11", "W3"); I(symb="J80", c="(0) = WORD SYMBOL (ATTRIBUTE (0))")
+I(symb="J11", c="J11: X4[WORD] = TEXT TERM")
 I("11", "W3"); I(symb="J60", c="NEXT WORD CELL")
 I("70", "9-5", c="IF H5-, ALL LABELLED: GO 9-5")
 I("20", "W3", c="W3 = NEXT WORD CELL")
 I("11", "W6"); I(symb="J60"); I("20", "W6", link="9-4", c="NEXT TEXT CELL; LOOP")
 I(symb="J8", name="9-5", c="POP LEFTOVER CELL")
 C("PHASE 1: TRAIN. START AT THE HEAD CELL OF THE TEXT LIST AND STEP TO ITS FIRST CELL WITH J60 (LOCATE NEXT CELL).")
-I("10", "T39", c="PUSH TEXT LIST HEAD T39")
+I("10", "X1", c="PUSH TEXT LIST HEAD X1")
 I(symb="J60", c="J60: (0) = FIRST TEXT CELL")
 I("20", "W6", c="W6 = FIRST CELL; POP")
 C("READ THE WORD IN THAT CELL WITH J80 (SYMBOL IN CELL); IT IS THE PREVIOUS WORD W4. KEEP A COPY IN W7 SO THE LAST WORD CAN WRAP AROUND TO THE FIRST.")
@@ -114,18 +116,21 @@ I(symb="J8", name="9-9", c="POP LEFTOVER CELL")
 I("11", "W7"); I("20", "W5", c="W5 = FIRST WORD")
 I(symb="G2", c="G2: COUNT PAIR (W4 -> W5)")
 if table:
-    C("PRINT THE TRAINED TABLE: WALK THE VOCABULARY LIST T38 (LOOP 9-6) AND PRINT EACH WORD WITH J150 (PRINT LIST STRUCTURE), WHICH INCLUDES ITS DESCRIPTION LIST.")
-    I("10", "T38"); I(symb="J60"); I("20", "W6", c="W6 = FIRST VOCAB CELL")
-    I("11", "W6", "9-6", c="PRINT LOOP: PUSH CELL")
-    I(symb="J80", c="(0) = WORD IN CELL")
-    I(symb="J150", c="J150: PRINT THE WORD'S LISTS")
-    I("11", "W6"); I(symb="J60", c="NEXT VOCAB CELL")
-    I("70", "9-7", c="IF H5-, DONE: GO 9-7")
-    I("20", "W6", link="9-6", c="W6 = NEXT CELL; LOOP")
+    C("PRINT THE CONTINUATION TABLE: FOR EVERY WORD ON THE WORD LIST X2, PRINT A SEPARATOR CARD (K2), THEN CALL G3, WHICH PRINTS THE WORD AND, FOR EACH SUCCESSOR, ITS TEXT FOLLOWED BY ITS COUNT. A FINAL SEPARATOR ENDS THE TABLE.")
+    I("10", "X2"); I(symb="J60"); I("20", "W3", c="W3 = FIRST WORD CELL")
+    I("11", "W3", "9-6", c="TABLE LOOP: PUSH WORD CELL")
+    I(symb="J80", c="(0) = WORD SYMBOL")
+    I("20", "W9", c="W9 = WORD TO PRINT; POP")
+    I("10", "K2"); I(symb="J152", c="PRINT SEPARATOR ****")
+    I(symb="G3", c="G3: PRINT WORD + ITS SUCCESSORS")
+    I("11", "W3"); I(symb="J60", c="NEXT WORD CELL")
+    I("70", "9-7", c="IF H5-, TABLE DONE: GO 9-7")
+    I("20", "W3", link="9-6", c="W3 = NEXT CELL; LOOP")
     I(symb="J8", name="9-7", c="POP LEFTOVER CELL")
+    I("10", "K2"); I(symb="J152", c="PRINT END-OF-TABLE MARK ****")
 C("PHASE 2: GENERATE. W9 = FIRST WORD; PRINT IT WITH J152 (PRINT SYMBOL).")
 I("10", text[0], c="PUSH FIRST WORD"); I("20", "W9", c="W9 = CURRENT WORD; POP")
-I("11", "W9"); I("10", "K1"); I(symb="J10", c="J10: TEXT TERM OF WORD"); I(symb="J152", c="PRINT ITS TEXT")
+I("10", "X4"); I("11", "W9"); I(symb="J10", c="J10: TEXT TERM OF WORD"); I(symb="J152", c="PRINT ITS TEXT")
 C("STEP COUNTER W8 IS A FRESH COPY (J120) OF THE CONSTANT ZERO N2, SO J125 (ADD 1) DOES NOT CHANGE THE CONSTANT.")
 I("10", "N2"); I(symb="J120", c="J120: COPY OF ZERO"); I("20", "W8", c="W8 = COUNTER = 0")
 C("GENERATION LOOP, LABEL 9-2. J116 TESTS (0) < (1): PUSH THE LIMIT N1 FIRST, THEN THE COUNTER. 70 9-3 LEAVES THE LOOP WHEN THE TEST FAILS (H5-).")
@@ -140,12 +145,31 @@ I(symb="J7", name="9-3", link="0", c="9-3: HALT")
 
 L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
 C("--- G1: ONE GENERATION STEP ---",
-  "INPUT: W9 = CURRENT WORD. OUTPUT: W9 = NEXT WORD, AND ITS 4-LETTER TEXT (J10 ON ATTRIBUTE K1, THEN J152) IS PRINTED.",
+  "INPUT: W9 = CURRENT WORD. OUTPUT: W9 = NEXT WORD, AND ITS 4-LETTER TEXT (J10 ON THE MAP X4, THEN J152) IS PRINTED.",
   "J16 TAKES A DESCRIBABLE LIST (THE CURRENT WORD) AND RETURNS ONE OF THE ATTRIBUTES OF ITS DESCRIPTION LIST (A SUCCESSOR WORD), CHOSEN AT RANDOM WITH PROBABILITY PROPORTIONAL TO THE INTEGER COUNT VALUE.")
 I("11", "W9", "G1", c="PUSH CURRENT WORD")
 I(symb="J16", c="J16: (0) = WEIGHTED RANDOM SUCCESSOR")
 I("20", "W9", c="W9 = NEXT WORD; POP")
-I("11", "W9"); I("10", "K1"); I(symb="J10", c="J10: TEXT TERM OF NEW WORD"); I(symb="J152", link="0", c="PRINT ITS TEXT; END OF G1")
+I("10", "X4"); I("11", "W9"); I(symb="J10", c="J10: TEXT TERM OF NEW WORD"); I(symb="J152", link="0", c="PRINT ITS TEXT; END OF G1")
+
+L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
+C("--- G3: PRINT ONE WORD AND ITS CONTINUATIONS ---",
+  "INPUT: W9 = WORD. OUTPUT (ONE CARD EACH): THE WORD'S TEXT, THEN FOR EVERY SUCCESSOR ITS TEXT AND ITS COUNT.",
+  "THE WORD'S DESCRIPTION LIST IS NAMED IN THE HEAD OF THE WORD'S LIST, SO J80 ON THE WORD GIVES IT. ITS CELLS ALTERNATE ATTRIBUTE (A SUCCESSOR WORD), VALUE (ITS COUNT), ATTRIBUTE, VALUE...",
+  "CELLS: W4 CURRENT DESCRIPTION-LIST CELL, W5 SUCCESSOR, W6 COUNT.")
+I("10", "X4", "G3", c="PUSH MAP X4"); I("11", "W9"); I(symb="J10", c="J10: TEXT TERM OF THE WORD"); I(symb="J152", c="PRINT WORD TEXT")
+I("11", "W9"); I(symb="J80", c="J80: (0) = DESCRIPTION LIST NAME")
+I(symb="J60", c="J60: (0) = FIRST ATTRIBUTE CELL"); I("20", "W4", c="W4 = ATTRIBUTE CELL; POP")
+C("LOOP 9-3: READ THE SUCCESSOR (W5), STEP TO THE VALUE CELL AND READ THE COUNT (W6), THEN PRINT BOTH.")
+I("11", "W4", "9-3", c="LOOP: PUSH ATTRIBUTE CELL"); I(symb="J80", c="(0) = SUCCESSOR SYMBOL"); I("20", "W5", c="W5 = SUCCESSOR")
+I("11", "W4"); I(symb="J60", c="J60: VALUE CELL"); I("20", "W4")
+I("11", "W4"); I(symb="J80", c="(0) = COUNT"); I("20", "W6", c="W6 = COUNT")
+I("10", "X4"); I("11", "W5"); I(symb="J10", c="J10: TEXT TERM OF SUCCESSOR"); I(symb="J152", c="PRINT SUCCESSOR TEXT")
+I("11", "W6"); I(symb="J152", c="PRINT ITS COUNT")
+I("11", "W4", c="ADVANCE: PUSH CELL"); I(symb="J60", c="J60: NEXT ATTRIBUTE CELL")
+I("70", "9-7", c="IF H5-, NO MORE: GO 9-7")
+I("20", "W4", link="9-3", c="W4 = NEXT CELL; LOOP")
+I(symb="J8", name="9-7", link="0", c="POP LEFTOVER CELL; END OF G3")
 
 L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
 C("--- G2: COUNT ONE BIGRAM ---",
@@ -168,18 +192,21 @@ I(symb="J0", name="9-6", link="0", c="9-6: END OF G2 (NO-OP)")
 L.append(card("DATA HEADER. TYPE=5,Q=1.", typ="5", pq="01"))
 C("DATA. CONSTANTS: N1 = NUMBER OF WORDS TO GENERATE, N2 = ZERO, N3 = ONE.")
 L.append(const("N1 = STEPS", "N1", steps)); L.append(const("N2 = ZERO", "N2", 0)); L.append(const("N3 = ONE", "N3", 1))
+L.append(alnum("K2", "****"))
 C("TEXT TERMS: ALPHANUMERIC DATA TERMS Vn HOLDING EACH WORD'S 4-LETTER ABBREVIATION (SEE RAVEN4.VOCAB).")
 for i, (w, v) in enumerate(vocab.items(), 1): L.append(alnum("V%d" % i, abbr[w]))
-C("LIST T37 = TEXT TERMS, LIST T38 = WORD SYMBOLS, IN THE SAME ORDER.")
-L.append(card("TEXT-TERM LIST", name="T37", symb="0"))
+C("LIST X3 = TEXT TERMS, LIST X2 = WORD SYMBOLS, IN THE SAME ORDER.")
+L.append(card("TEXT-TERM LIST", name="X3", symb="0"))
 for k in range(1, len(vocab) + 1): L.append(card("", symb="V%d" % k, link="0" if k == len(vocab) else ""))
-L.append(card("WORD LIST", name="T38", symb="0"))
+L.append(card("WORD LIST", name="X2", symb="0"))
 for k, v in enumerate(vocab.values(), 1): L.append(card("", symb=v, link="0" if k == len(vocab) else ""))
 C("WORD HEADS, ONE PER WORD: AN EMPTY DESCRIBABLE LIST (HEAD CELL, LINK 0) NAMED BY THE WORD SYMBOL. J11 FILLS IN THE DESCRIPTION LIST DURING TRAINING.")
 for w, v in vocab.items():
     L.append(card("HEAD OF " + w.upper(), name=v, symb="0", link="0"))
-C("THE TEXT, AS A LIST OF WORD SYMBOLS, HEAD T39: " + " ".join(words).upper())
-L.append(card("TEXT LIST", name="T39", symb="0"))
+C("THE MAP LIST X4: EMPTY HEAD; ITS DESCRIPTION LIST IS BUILT BY PHASE 0.")
+L.append(card("MAP LIST", name="X4", symb="0", link="0"))
+C("THE TEXT, AS A LIST OF WORD SYMBOLS, HEAD X1: " + " ".join(words).upper())
+L.append(card("TEXT LIST", name="X1", symb="0"))
 for k, t in enumerate(text):
     L.append(card("", symb=t, link="0" if k == len(text) - 1 else ""))
 L.append(card("START AT A0", typ="5", symb="A0"))

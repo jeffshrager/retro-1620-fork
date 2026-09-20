@@ -5,6 +5,58 @@ logged, traces under `traces/` at the repo root.
 
 ---
 
+## 2026-09-21 -- two stanzas, continuation table, and the "trap" was J16 (correction)
+
+**Scaled to 12 lines** (2 stanzas): 115 tokens, 83 distinct words, 100 generated
+steps, list region `L0` = 900 cells, **runs at the default 40000 digits** (700
+also works; `L0` = 1100 does NOT fit in 40000 digits -- 724 traps, never finishes;
+1500 works with `--memory 60000`). Defaults in `mkdeck.py` are now `12 100 --lspace=900`.
+
+**Continuation table.** New routine `G3` (called per word from a table loop over
+vocabulary list `X2`; on by default, `--no-table` to omit) prints, one card each,
+the word text then every successor's text and count, with `****` separator cards.
+`decode.py run.log` turns the punched cards into the readable table plus the
+generated text; a saved result is `raven4_decoded.txt` (85 table rows, e.g.
+`WHIL : I 2`, `AT : MY 2`, `MY : CHAM 2, BOOK 1`, `THE : ...`). All 100 generated
+transitions verified to exist in the table.
+
+**Correction to the previous entry.** The "TRAPPED ON 00001/00003" was NOT list-space
+exhaustion. It came from `J16`: it tests every attribute's value as a number, and
+the `K1` attribute (word -> alphanumeric text term) stored on each word's
+description list is non-numeric, so **every `J16` call trapped twice** (harmless to
+the output but it leaks). This had been present since the K1 change (the pushed
+commit d04319a traps 2x per step; I had filtered the log with `grep " 81 "` and
+missed it). Fix: the word -> text map now lives on **one separate describable list
+`X4`** (attribute = word `Tn`, value = text term `Vn`; lookup = `J10` on `X4`), so
+successor description lists contain only numeric counts. Result: **0 traps**, and the
+cat test that died at ~79 steps now runs all 300 steps with `L0` = 300.
+So bug 2 (unrestored `W0`-`W2`) is still real but is *not* what limited generation
+length; it is worked around (variables in `W4`-`W9`).
+
+Other changes: support lists renamed `X1` (text), `X2` (words), `X3` (text terms),
+`X4` (map) so the vocabulary can exceed 36; `T0`/`V0` sized to vocabulary + 2.
+
+---
+
+## 2026-09-20 (verification) -- do the counts really drive generation? Yes; but generation traps after ~80 steps
+
+Two-line corpus had no repeated bigram (all counts 1), so the increment path
+and the weighting were not exercised. Test corpus (scratch copy of
+`mkdeck.py` with a custom `raven.txt`): *the cat sat on the mat the cat ran the
+cat sat*, 300 steps, `--table`. **Trained table exactly right:** the->cat 3,
+the->mat 1, cat->sat 2, cat->ran 1, sat->on 1, sat->the 1 (wrap), on/mat/ran->the
+1. **Sampling follows the counts** (79 steps): the->cat 19 vs the->mat 9
+(expect 3:1), cat->sat 10 vs cat->ran 8 (expect 2:1).
+
+**Problem:** after ~79 generated words the run hits `TRAPPED ON 00003` (error
+trap, repeats forever). Consistent with **list-space exhaustion from bug 2** (the
+library routines' unbalanced preserve/restore leaks ~2-3 pushdown cells per
+`J16`/`J10` call; region `L0` = 200 cells). So generation length is currently
+bounded by `L0`, and core (40000 digits, 12 per cell) limits how far `L0` can
+grow. Not yet confirmed as the cause (would need `H2` monitored).
+
+---
+
 ## 2026-09-20 (later) -- `raven4.ipl` now prints WORDS (4-letter abbreviations), not `T###`
 
 Jeff's compromise: give each word a 4-letter abbreviation and print that.

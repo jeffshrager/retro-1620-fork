@@ -1,11 +1,11 @@
       RAVEN4: TRAIN + GENERATE          9
       BIGRAM MARKOV TEXT GENERATOR USING1
       DESCRIPTION LISTS.                1
-      TEXT: FIRST 2 LINES OF THE RAVEN, 1
-      21 TOKENS, 19 DISTINCT WORDS (SEE 1
+      TEXT: FIRST 12 LINES OF THE RAVEN,1
+      115 TOKENS, 83 DISTINCT WORDS (SEE1
       RAVEN4.VOCAB).                    1
       EVERY WORD IS A REGIONAL SYMBOL   1
-      T1..T19, AND IS ALSO A DESCRIBABLE1
+      T1..T83, AND IS ALSO A DESCRIBABLE1
       LIST (A HEAD CELL, INITIALLY      1
       EMPTY).                           1
       A WORD'S DESCRIPTION LIST HOLDS   1
@@ -15,16 +15,19 @@
       DATA TERM COUNTING HOW OFTEN. ONLY1
       SUCCESSORS ACTUALLY SEEN ARE      1
       STORED, SO THE TABLE IS SPARSE.   1
-      EACH WORD SYMBOL Tn ALSO HAS      1
-      ATTRIBUTE K1 WHOSE VALUE IS A     1
-      4-LETTER ALPHANUMERIC DATA TERM Vn1
-      (E.G. ONCE) SO THAT OUTPUT SHOWS  1
-      THE WORD. J16 IGNORES IT BECAUSE  1
-      IT ONLY WEIGHS NUMERIC VALUES.    1
+      TEXT FOR OUTPUT: EACH WORD SYMBOL 1
+      Tn HAS A 4-LETTER ALPHANUMERIC    1
+      DATA TERM Vn (E.G. ONCE). THE MAP 1
+      Tn -> Vn IS THE DESCRIPTION LIST  1
+      OF ONE SEPARATE DESCRIBABLE LIST  1
+      X4 (ATTRIBUTE Tn, VALUE Vn). IT IS1
+      KEPT OUT OF THE SUCCESSOR LISTS   1
+      BECAUSE J16 TRAPS ON NON-NUMERIC  1
+      VALUES.                           1
       PHASE 0 (LABEL): ATTACH THE TEXT  1
       TERMS. PHASE 1 (TRAIN): FOR EACH  1
       ADJACENT PAIR (PREV, THIS) OF THE 1
-      TEXT LIST T39, ADD 1 TO THE COUNT 1
+      TEXT LIST X1, ADD 1 TO THE COUNT  1
       OF THIS IN PREV'S DESCRIPTION     1
       LIST, CREATING IT WITH COUNT 1 IF 1
       IT IS NEW (ROUTINE G2).           1
@@ -40,38 +43,45 @@
       CELL, W5 THIS WORD, W7 FIRST WORD,1
       W8 STEP COUNTER.                  1
       DEFINE REGIONS                    2 A0            2
-      LIST REGION                       2 L0            300
-      TOKEN REGION                      2 T0            40
+      LIST REGION                       2 L0            900
+      TOKEN REGION                      2 T0            85
+      SUPPORT LIST REGION               2 X0            6
       ROUTINE REGION                    2 G0            4
       NUMBER REGION                     2 N0            4
-      WORD-TEXT REGION                  2 V0            40
-      ATTRIBUTE KEY REGION              2 K0            2
+      WORD-TEXT REGION                  2 V0            85
+      ATTRIBUTE KEY REGION              2 K0            3
+      SIZES: T0/V0 = VOCABULARY + 2. X0 1
+      HOLDS THE THREE SUPPORT LISTS X1  1
+      (TEXT), X2 (WORDS), X3 (TEXT      1
+      TERMS). X4 IS THE WORD -> TEXT    1
+      MAP, K2 A TABLE SEPARATOR MARK.   1
       REGION L0 SUPPLIES CELLS FOR THE  1
       PUSHDOWN STACK AND FOR THE        1
       DESCRIPTION LISTS AND COUNTS BUILT1
       DURING TRAINING.                  1
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
       --- MAIN PROGRAM A0 ---           1
-      PHASE 0: LABEL THE WORDS. LIST T381
-      HOLDS THE WORD SYMBOLS T1..T19 AND1
-      LIST T37 THE MATCHING TEXT TERMS  1
-      V1..V19 IN THE SAME ORDER. WALK   1
-      BOTH IN STEP AND DO J11: ASSIGN   1
-      (1) AS VALUE OF ATTRIBUTE (0) OF  1
-      LIST (2), I.E. PUSH THE WORD, THEN1
-      ITS TEXT TERM, THEN THE KEY K1.   1
-      PUSH WORD LIST T38                  A0    10T38
+      PHASE 0: BUILD THE TEXT MAP. LIST 1
+      X2 HOLDS THE WORD SYMBOLS T1..T83 1
+      AND LIST X3 THE MATCHING TEXT     1
+      TERMS V1..V83 IN THE SAME ORDER.  1
+      WALK BOTH IN STEP AND DO J11 ON   1
+      LIST X4: ASSIGN (1) AS VALUE OF   1
+      ATTRIBUTE (0) OF LIST (2), I.E.   1
+      PUSH X4, THEN THE TEXT TERM, THEN 1
+      THE ATTRIBUTE.                    1
+      PUSH WORD LIST X2                   A0    10X2
       J60: (0) = FIRST WORD CELL                  J60
       W3 = WORD CELL; POP                       20W3
-                                                10T37
+                                                10X3
       (0) = FIRST TEXT-TERM CELL                  J60
       W6 = TEXT CELL; POP                       20W6
-      LABEL LOOP: PUSH WORD CELL          9-4   11W3
-      (0) = WORD SYMBOL (LIST (2))                J80
+      MAP LOOP: PUSH MAP LIST X4 = (2)    9-4   10X4
                                                 11W6
       (0) = TEXT TERM (VALUE (1))                 J80
-      PUSH KEY K1 (ATTRIBUTE (0))               10K1
-      J11: WORD[K1] = TEXT TERM                   J11
+                                                11W3
+      (0) = WORD SYMBOL (ATTRIBUTE (0))           J80
+      J11: X4[WORD] = TEXT TERM                   J11
                                                 11W3
       NEXT WORD CELL                              J60
       IF H5-, ALL LABELLED: GO 9-5              709-5
@@ -84,7 +94,7 @@
       CELL OF THE TEXT LIST AND STEP TO 1
       ITS FIRST CELL WITH J60 (LOCATE   1
       NEXT CELL).                       1
-      PUSH TEXT LIST HEAD T39                   10T39
+      PUSH TEXT LIST HEAD X1                    10X1
       J60: (0) = FIRST TEXT CELL                  J60
       W6 = FIRST CELL; POP                      20W6
       READ THE WORD IN THAT CELL WITH   1
@@ -122,29 +132,36 @@
                                                 11W7
       W5 = FIRST WORD                           20W5
       G2: COUNT PAIR (W4 -> W5)                   G2
-      PRINT THE TRAINED TABLE: WALK THE 1
-      VOCABULARY LIST T38 (LOOP 9-6) AND1
-      PRINT EACH WORD WITH J150 (PRINT  1
-      LIST STRUCTURE), WHICH INCLUDES   1
-      ITS DESCRIPTION LIST.             1
-                                                10T38
+      PRINT THE CONTINUATION TABLE: FOR 1
+      EVERY WORD ON THE WORD LIST X2,   1
+      PRINT A SEPARATOR CARD (K2), THEN 1
+      CALL G3, WHICH PRINTS THE WORD    1
+      AND, FOR EACH SUCCESSOR, ITS TEXT 1
+      FOLLOWED BY ITS COUNT. A FINAL    1
+      SEPARATOR ENDS THE TABLE.         1
+                                                10X2
                                                   J60
-      W6 = FIRST VOCAB CELL                     20W6
-      PRINT LOOP: PUSH CELL               9-6   11W6
-      (0) = WORD IN CELL                          J80
-      J150: PRINT THE WORD'S LISTS                J150
-                                                11W6
-      NEXT VOCAB CELL                             J60
-      IF H5-, DONE: GO 9-7                      709-7
-      W6 = NEXT CELL; LOOP                      20W6    9-6
+      W3 = FIRST WORD CELL                      20W3
+      TABLE LOOP: PUSH WORD CELL          9-6   11W3
+      (0) = WORD SYMBOL                           J80
+      W9 = WORD TO PRINT; POP                   20W9
+                                                10K2
+      PRINT SEPARATOR ****                        J152
+      G3: PRINT WORD + ITS SUCCESSORS             G3
+                                                11W3
+      NEXT WORD CELL                              J60
+      IF H5-, TABLE DONE: GO 9-7                709-7
+      W3 = NEXT CELL; LOOP                      20W3    9-6
       POP LEFTOVER CELL                   9-7     J8
+                                                10K2
+      PRINT END-OF-TABLE MARK ****                J152
       PHASE 2: GENERATE. W9 = FIRST     1
       WORD; PRINT IT WITH J152 (PRINT   1
       SYMBOL).                          1
       PUSH FIRST WORD                           10T1
       W9 = CURRENT WORD; POP                    20W9
+                                                10X4
                                                 11W9
-                                                10K1
       J10: TEXT TERM OF WORD                      J10
       PRINT ITS TEXT                              J152
       STEP COUNTER W8 IS A FRESH COPY   1
@@ -172,7 +189,7 @@
       --- G1: ONE GENERATION STEP ---   1
       INPUT: W9 = CURRENT WORD. OUTPUT: 1
       W9 = NEXT WORD, AND ITS 4-LETTER  1
-      TEXT (J10 ON ATTRIBUTE K1, THEN   1
+      TEXT (J10 ON THE MAP X4, THEN     1
       J152) IS PRINTED.                 1
       J16 TAKES A DESCRIBABLE LIST (THE 1
       CURRENT WORD) AND RETURNS ONE OF  1
@@ -184,10 +201,56 @@
       PUSH CURRENT WORD                   G1    11W9
       J16: (0) = WEIGHTED RANDOM SUCCESS          J16
       W9 = NEXT WORD; POP                       20W9
+                                                10X4
                                                 11W9
-                                                10K1
       J10: TEXT TERM OF NEW WORD                  J10
       PRINT ITS TEXT; END OF G1                   J152  0
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      --- G3: PRINT ONE WORD AND ITS    1
+      CONTINUATIONS ---                 1
+      INPUT: W9 = WORD. OUTPUT (ONE CARD1
+      EACH): THE WORD'S TEXT, THEN FOR  1
+      EVERY SUCCESSOR ITS TEXT AND ITS  1
+      COUNT.                            1
+      THE WORD'S DESCRIPTION LIST IS    1
+      NAMED IN THE HEAD OF THE WORD'S   1
+      LIST, SO J80 ON THE WORD GIVES IT.1
+      ITS CELLS ALTERNATE ATTRIBUTE (A  1
+      SUCCESSOR WORD), VALUE (ITS       1
+      COUNT), ATTRIBUTE, VALUE...       1
+      CELLS: W4 CURRENT DESCRIPTION-LIST1
+      CELL, W5 SUCCESSOR, W6 COUNT.     1
+      PUSH MAP X4                         G3    10X4
+                                                11W9
+      J10: TEXT TERM OF THE WORD                  J10
+      PRINT WORD TEXT                             J152
+                                                11W9
+      J80: (0) = DESCRIPTION LIST NAME            J80
+      J60: (0) = FIRST ATTRIBUTE CELL             J60
+      W4 = ATTRIBUTE CELL; POP                  20W4
+      LOOP 9-3: READ THE SUCCESSOR (W5),1
+      STEP TO THE VALUE CELL AND READ   1
+      THE COUNT (W6), THEN PRINT BOTH.  1
+      LOOP: PUSH ATTRIBUTE CELL           9-3   11W4
+      (0) = SUCCESSOR SYMBOL                      J80
+      W5 = SUCCESSOR                            20W5
+                                                11W4
+      J60: VALUE CELL                             J60
+                                                20W4
+                                                11W4
+      (0) = COUNT                                 J80
+      W6 = COUNT                                20W6
+                                                10X4
+                                                11W5
+      J10: TEXT TERM OF SUCCESSOR                 J10
+      PRINT SUCCESSOR TEXT                        J152
+                                                11W6
+      PRINT ITS COUNT                             J152
+      ADVANCE: PUSH CELL                        11W4
+      J60: NEXT ATTRIBUTE CELL                    J60
+      IF H5-, NO MORE: GO 9-7                   709-7
+      W4 = NEXT CELL; LOOP                      20W4    9-3
+      POP LEFTOVER CELL; END OF G3        9-7     J8    0
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
       --- G2: COUNT ONE BIGRAM ---      1
       INPUT: W4 = PREVIOUS WORD, W5 =   1
@@ -229,9 +292,10 @@
       DATA. CONSTANTS: N1 = NUMBER OF   1
       WORDS TO GENERATE, N2 = ZERO, N3 =1
       ONE.                              1
-      N1 = STEPS                          N1    01         40
+      N1 = STEPS                          N1    01        100
       N2 = ZERO                           N2    01          0
       N3 = ONE                            N3    01          1
+                                          K2    21****
       TEXT TERMS: ALPHANUMERIC DATA     1
       TERMS Vn HOLDING EACH WORD'S      1
       4-LETTER ABBREVIATION (SEE        1
@@ -255,9 +319,73 @@
                                           V17   21OF
                                           V18   21FORG
                                           V19   21LORE
-      LIST T37 = TEXT TERMS, LIST T38 = 1
+                                          V20   21NODD
+                                          V21   21NEAR
+                                          V22   21NAPP
+                                          V23   21SUDD
+                                          V24   21THER
+                                          V25   21CAME
+                                          V26   21TAPP
+                                          V27   21AS
+                                          V28   21SOME
+                                          V29   21ONE
+                                          V30   21GENT
+                                          V31   21RAPP
+                                          V32   21AT
+                                          V33   21MY
+                                          V34   21CHAM
+                                          V35   21DOOR
+                                          V36   21TIS
+                                          V37   21VISI
+                                          V38   21MUTT
+                                          V39   21ONLY
+                                          V40   21THIS
+                                          V41   21NOTH
+                                          V42   21MORE
+                                          V43   21AH
+                                          V44   21DIST
+                                          V45   21REME
+                                          V46   21IT
+                                          V47   21WAS
+                                          V48   21IN
+                                          V49   21THE
+                                          V50   21BLEA
+                                          V51   21DECE
+                                          V52   21EACH
+                                          V53   21SEPA
+                                          V54   21DYIN
+                                          V55   21EMBE
+                                          V56   21WROU
+                                          V57   21ITS
+                                          V58   21GHOS
+                                          V59   21FLOO
+                                          V60   21EAGE
+                                          V61   21WISH
+                                          V62   21MORR
+                                          V63   21VAIN
+                                          V64   21HAD
+                                          V65   21SOUG
+                                          V66   21TO
+                                          V67   21BORR
+                                          V68   21FROM
+                                          V69   21BOOK
+                                          V70   21SURC
+                                          V71   21SORR
+                                          V72   21FOR
+                                          V73   21LOST
+                                          V74   21LENO
+                                          V75   21RARE
+                                          V76   21RADI
+                                          V77   21MAID
+                                          V78   21WHOM
+                                          V79   21ANGE
+                                          V80   21NAME
+                                          V81   21NAM1
+                                          V82   21HERE
+                                          V83   21EVER
+      LIST X3 = TEXT TERMS, LIST X2 =   1
       WORD SYMBOLS, IN THE SAME ORDER.  1
-      TEXT-TERM LIST                      T37     0
+      TEXT-TERM LIST                      X3      0
                                                   V1
                                                   V2
                                                   V3
@@ -276,8 +404,72 @@
                                                   V16
                                                   V17
                                                   V18
-                                                  V19   0
-      WORD LIST                           T38     0
+                                                  V19
+                                                  V20
+                                                  V21
+                                                  V22
+                                                  V23
+                                                  V24
+                                                  V25
+                                                  V26
+                                                  V27
+                                                  V28
+                                                  V29
+                                                  V30
+                                                  V31
+                                                  V32
+                                                  V33
+                                                  V34
+                                                  V35
+                                                  V36
+                                                  V37
+                                                  V38
+                                                  V39
+                                                  V40
+                                                  V41
+                                                  V42
+                                                  V43
+                                                  V44
+                                                  V45
+                                                  V46
+                                                  V47
+                                                  V48
+                                                  V49
+                                                  V50
+                                                  V51
+                                                  V52
+                                                  V53
+                                                  V54
+                                                  V55
+                                                  V56
+                                                  V57
+                                                  V58
+                                                  V59
+                                                  V60
+                                                  V61
+                                                  V62
+                                                  V63
+                                                  V64
+                                                  V65
+                                                  V66
+                                                  V67
+                                                  V68
+                                                  V69
+                                                  V70
+                                                  V71
+                                                  V72
+                                                  V73
+                                                  V74
+                                                  V75
+                                                  V76
+                                                  V77
+                                                  V78
+                                                  V79
+                                                  V80
+                                                  V81
+                                                  V82
+                                                  V83   0
+      WORD LIST                           X2      0
                                                   T1
                                                   T2
                                                   T3
@@ -296,7 +488,71 @@
                                                   T16
                                                   T17
                                                   T18
-                                                  T19   0
+                                                  T19
+                                                  T20
+                                                  T21
+                                                  T22
+                                                  T23
+                                                  T24
+                                                  T25
+                                                  T26
+                                                  T27
+                                                  T28
+                                                  T29
+                                                  T30
+                                                  T31
+                                                  T32
+                                                  T33
+                                                  T34
+                                                  T35
+                                                  T36
+                                                  T37
+                                                  T38
+                                                  T39
+                                                  T40
+                                                  T41
+                                                  T42
+                                                  T43
+                                                  T44
+                                                  T45
+                                                  T46
+                                                  T47
+                                                  T48
+                                                  T49
+                                                  T50
+                                                  T51
+                                                  T52
+                                                  T53
+                                                  T54
+                                                  T55
+                                                  T56
+                                                  T57
+                                                  T58
+                                                  T59
+                                                  T60
+                                                  T61
+                                                  T62
+                                                  T63
+                                                  T64
+                                                  T65
+                                                  T66
+                                                  T67
+                                                  T68
+                                                  T69
+                                                  T70
+                                                  T71
+                                                  T72
+                                                  T73
+                                                  T74
+                                                  T75
+                                                  T76
+                                                  T77
+                                                  T78
+                                                  T79
+                                                  T80
+                                                  T81
+                                                  T82
+                                                  T83   0
       WORD HEADS, ONE PER WORD: AN EMPTY1
       DESCRIBABLE LIST (HEAD CELL, LINK 1
       0) NAMED BY THE WORD SYMBOL. J11  1
@@ -321,13 +577,97 @@
       HEAD OF OF                          T17     0     0
       HEAD OF FORGOTTEN                   T18     0     0
       HEAD OF LORE                        T19     0     0
+      HEAD OF NODDED                      T20     0     0
+      HEAD OF NEARLY                      T21     0     0
+      HEAD OF NAPPING                     T22     0     0
+      HEAD OF SUDDENLY                    T23     0     0
+      HEAD OF THERE                       T24     0     0
+      HEAD OF CAME                        T25     0     0
+      HEAD OF TAPPING                     T26     0     0
+      HEAD OF AS                          T27     0     0
+      HEAD OF SOME                        T28     0     0
+      HEAD OF ONE                         T29     0     0
+      HEAD OF GENTLY                      T30     0     0
+      HEAD OF RAPPING                     T31     0     0
+      HEAD OF AT                          T32     0     0
+      HEAD OF MY                          T33     0     0
+      HEAD OF CHAMBER                     T34     0     0
+      HEAD OF DOOR                        T35     0     0
+      HEAD OF 'TIS                        T36     0     0
+      HEAD OF VISITER                     T37     0     0
+      HEAD OF MUTTERED                    T38     0     0
+      HEAD OF ONLY                        T39     0     0
+      HEAD OF THIS                        T40     0     0
+      HEAD OF NOTHING                     T41     0     0
+      HEAD OF MORE                        T42     0     0
+      HEAD OF AH                          T43     0     0
+      HEAD OF DISTINCTLY                  T44     0     0
+      HEAD OF REMEMBER                    T45     0     0
+      HEAD OF IT                          T46     0     0
+      HEAD OF WAS                         T47     0     0
+      HEAD OF IN                          T48     0     0
+      HEAD OF THE                         T49     0     0
+      HEAD OF BLEAK                       T50     0     0
+      HEAD OF DECEMBER                    T51     0     0
+      HEAD OF EACH                        T52     0     0
+      HEAD OF SEPARATE                    T53     0     0
+      HEAD OF DYING                       T54     0     0
+      HEAD OF EMBER                       T55     0     0
+      HEAD OF WROUGHT                     T56     0     0
+      HEAD OF ITS                         T57     0     0
+      HEAD OF GHOST                       T58     0     0
+      HEAD OF FLOOR                       T59     0     0
+      HEAD OF EAGERLY                     T60     0     0
+      HEAD OF WISHED                      T61     0     0
+      HEAD OF MORROW                      T62     0     0
+      HEAD OF VAINLY                      T63     0     0
+      HEAD OF HAD                         T64     0     0
+      HEAD OF SOUGHT                      T65     0     0
+      HEAD OF TO                          T66     0     0
+      HEAD OF BORROW                      T67     0     0
+      HEAD OF FROM                        T68     0     0
+      HEAD OF BOOKS                       T69     0     0
+      HEAD OF SURCEASE                    T70     0     0
+      HEAD OF SORROW                      T71     0     0
+      HEAD OF FOR                         T72     0     0
+      HEAD OF LOST                        T73     0     0
+      HEAD OF LENORE                      T74     0     0
+      HEAD OF RARE                        T75     0     0
+      HEAD OF RADIANT                     T76     0     0
+      HEAD OF MAIDEN                      T77     0     0
+      HEAD OF WHOM                        T78     0     0
+      HEAD OF ANGELS                      T79     0     0
+      HEAD OF NAME                        T80     0     0
+      HEAD OF NAMELESS                    T81     0     0
+      HEAD OF HERE                        T82     0     0
+      HEAD OF EVERMORE                    T83     0     0
+      THE MAP LIST X4: EMPTY HEAD; ITS  1
+      DESCRIPTION LIST IS BUILT BY PHASE1
+      0.                                1
+      MAP LIST                            X4      0     0
       THE TEXT, AS A LIST OF WORD       1
-      SYMBOLS, HEAD T39: ONCE UPON A    1
+      SYMBOLS, HEAD X1: ONCE UPON A     1
       MIDNIGHT DREARY WHILE I PONDERED  1
       WEAK AND WEARY OVER MANY A QUAINT 1
       AND CURIOUS VOLUME OF FORGOTTEN   1
-      LORE                              1
-      TEXT LIST                           T39     0
+      LORE WHILE I NODDED NEARLY NAPPING1
+      SUDDENLY THERE CAME A TAPPING AS  1
+      OF SOME ONE GENTLY RAPPING RAPPING1
+      AT MY CHAMBER DOOR 'TIS SOME      1
+      VISITER I MUTTERED TAPPING AT MY  1
+      CHAMBER DOOR ONLY THIS AND NOTHING1
+      MORE AH DISTINCTLY I REMEMBER IT  1
+      WAS IN THE BLEAK DECEMBER AND EACH1
+      SEPARATE DYING EMBER WROUGHT ITS  1
+      GHOST UPON THE FLOOR EAGERLY I    1
+      WISHED THE MORROW VAINLY I HAD    1
+      SOUGHT TO BORROW FROM MY BOOKS    1
+      SURCEASE OF SORROW SORROW FOR THE 1
+      LOST LENORE FOR THE RARE AND      1
+      RADIANT MAIDEN WHOM THE ANGELS    1
+      NAME LENORE NAMELESS HERE FOR     1
+      EVERMORE                          1
+      TEXT LIST                           X1      0
                                                   T1
                                                   T2
                                                   T3
@@ -348,5 +688,99 @@
                                                   T16
                                                   T17
                                                   T18
-                                                  T19   0
+                                                  T19
+                                                  T6
+                                                  T7
+                                                  T20
+                                                  T21
+                                                  T22
+                                                  T23
+                                                  T24
+                                                  T25
+                                                  T3
+                                                  T26
+                                                  T27
+                                                  T17
+                                                  T28
+                                                  T29
+                                                  T30
+                                                  T31
+                                                  T31
+                                                  T32
+                                                  T33
+                                                  T34
+                                                  T35
+                                                  T36
+                                                  T28
+                                                  T37
+                                                  T7
+                                                  T38
+                                                  T26
+                                                  T32
+                                                  T33
+                                                  T34
+                                                  T35
+                                                  T39
+                                                  T40
+                                                  T10
+                                                  T41
+                                                  T42
+                                                  T43
+                                                  T44
+                                                  T7
+                                                  T45
+                                                  T46
+                                                  T47
+                                                  T48
+                                                  T49
+                                                  T50
+                                                  T51
+                                                  T10
+                                                  T52
+                                                  T53
+                                                  T54
+                                                  T55
+                                                  T56
+                                                  T57
+                                                  T58
+                                                  T2
+                                                  T49
+                                                  T59
+                                                  T60
+                                                  T7
+                                                  T61
+                                                  T49
+                                                  T62
+                                                  T63
+                                                  T7
+                                                  T64
+                                                  T65
+                                                  T66
+                                                  T67
+                                                  T68
+                                                  T33
+                                                  T69
+                                                  T70
+                                                  T17
+                                                  T71
+                                                  T71
+                                                  T72
+                                                  T49
+                                                  T73
+                                                  T74
+                                                  T72
+                                                  T49
+                                                  T75
+                                                  T10
+                                                  T76
+                                                  T77
+                                                  T78
+                                                  T49
+                                                  T79
+                                                  T80
+                                                  T74
+                                                  T81
+                                                  T82
+                                                  T72
+                                                  T83   0
       START AT A0                       5         A0
