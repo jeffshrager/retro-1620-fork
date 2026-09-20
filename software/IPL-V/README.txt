@@ -127,6 +127,9 @@ IPL-V-Subroutines.card
     after the source program and immediately before Deck-2 in the card
     reader.
 
+    (2026-09-20: two OCR errors fixed, "JB" -> "J8" in routines J15 and
+    J16. With "JB", J16 trapped forever.)
+
 simple/
     Small, incrementally-built IPL-V test programs (simple1.ipl through
     simple8.ipl) used to validate individual interpreter primitives in

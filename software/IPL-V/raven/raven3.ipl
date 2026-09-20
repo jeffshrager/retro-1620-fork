@@ -1,0 +1,232 @@
+      RAVEN3: TRAIN + GENERATE          9
+      BIGRAM MARKOV TEXT GENERATOR.     1
+      TEXT: FIRST 2 LINES OF THE RAVEN, 1
+      21 TOKENS, 19 DISTINCT WORDS (SEE 1
+      RAVEN3.VOCAB).                    1
+      EVERY WORD IS A REGIONAL SYMBOL   1
+      T1..T19. A WORD'S OWN SYMBOL NAMES1
+      ITS SUCCESSOR LIST: THE LIST OF   1
+      WORDS THAT FOLLOWED IT IN THE     1
+      TEXT. A WORD THAT FOLLOWED IT     1
+      TWICE APPEARS TWICE, SO THE COUNT 1
+      IS THE NUMBER OF REPEATS.         1
+      PHASE 1 (TRAIN): WALK THE TEXT    1
+      LIST T39 AND APPEND EACH WORD TO  1
+      THE LIST OF THE WORD BEFORE IT.   1
+      PHASE 2 (GENERATE): PRINT THE     1
+      TABLE, THEN REPEAT N TIMES: PICK A1
+      RANDOM WORD FROM THE CURRENT      1
+      WORD'S LIST, PRINT IT, MAKE IT    1
+      CURRENT.                          1
+      WORKING CELLS: W0 CURRENT WORD, W11
+      PREVIOUS WORD, W2 CURRENT TEXT    1
+      CELL, W3 THIS WORD, W4 FIRST WORD,1
+      W5 STEP COUNTER.                  1
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            200
+      TOKEN REGION                      2 T0            40
+      GENERATOR STEP REGION             2 G0            2
+      NUMBER REGION                     2 N0            4
+      REGION L0 SUPPLIES LIST CELLS FOR 1
+      THE PUSHDOWN STACK AND FOR THE NEW1
+      SUCCESSOR ENTRIES.                1
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      --- MAIN PROGRAM A0 ---           1
+      PHASE 1: TRAIN. START AT THE HEAD 1
+      CELL OF THE TEXT LIST AND STEP TO 1
+      ITS FIRST CELL WITH J60 (LOCATE   1
+      NEXT CELL).                       1
+      PUSH TEXT LIST HEAD T39             A0    10T39
+      J60: (0) = FIRST TEXT CELL                  J60
+      W2 = FIRST CELL; POP                      20W2
+      READ THE WORD IN THAT CELL WITH   1
+      J80 (SYMBOL IN CELL) AND REMEMBER 1
+      IT AS THE PREVIOUS WORD W1. ALSO  1
+      KEEP A COPY IN W4 SO THE LAST WORD1
+      CAN WRAP AROUND TO THE FIRST AT   1
+      THE END.                          1
+      PUSH CONTENTS OF W2 (THE CELL)            11W2
+      J80: (0) = WORD IN CELL                     J80
+      W1 = PREVIOUS WORD; POP                   20W1
+                                                11W1
+      W4 = FIRST WORD                           20W4
+      TRAINING LOOP, LABEL 9-1. STEP TO 1
+      THE NEXT TEXT CELL. J60 SETS H5+  1
+      IF THERE WAS ONE, H5- AT THE END  1
+      OF THE LIST; 70 9-9 BRANCHES TO   1
+      9-9 WHEN H5-.                     1
+      LOOP: PUSH CURRENT CELL             9-1   11W2
+      J60: (0) = NEXT CELL, SET H5                J60
+      IF H5-, TEXT ENDED: GO 9-9                709-9
+      W2 = NEXT CELL; POP                       20W2
+                                                11W2
+      (0) = WORD IN THAT CELL                     J80
+      W3 = THIS WORD; POP                       20W3
+      APPEND THIS WORD TO THE SUCCESSOR 1
+      LIST OF THE PREVIOUS WORD. J65 =  1
+      INSERT (0) AT END OF LIST (1), SO 1
+      PUSH THE LIST NAME (W1) FIRST,    1
+      THEN THE WORD (W3). THEN THIS WORD1
+      BECOMES THE PREVIOUS WORD.        1
+      PUSH PREV WORD = LIST NAME (1)            11W1
+      PUSH THIS WORD = (0)                      11W3
+      J65: APPEND W3 TO LIST W1                   J65
+                                                11W3
+      W1 = W3; GO BACK TO 9-1                   20W1    9-1
+      9-9: TRAINING DONE. J60 LEFT THE  1
+      LAST CELL ON THE STACK WHEN IT    1
+      FAILED; J8 POPS IT. THEN CLOSE THE1
+      CYCLE BY APPENDING THE FIRST WORD 1
+      (W4) TO THE LIST OF THE LAST WORD 1
+      (W1) SO NO WORD IS A DEAD END.    1
+      POP LEFTOVER CELL                   9-9     J8
+                                                11W1
+                                                11W4
+      APPEND FIRST WORD TO LAST WORD'S L          J65
+      PRINT THE TRAINED TABLE: J151     1
+      PRINTS EACH SUCCESSOR LIST (HEAD  1
+      LINE, THEN ONE SUCCESSOR PER      1
+      LINE).                            1
+                                                10T1
+                                                  J151
+                                                10T2
+                                                  J151
+                                                10T3
+                                                  J151
+                                                10T4
+                                                  J151
+                                                10T5
+                                                  J151
+                                                10T6
+                                                  J151
+                                                10T7
+                                                  J151
+                                                10T8
+                                                  J151
+                                                10T9
+                                                  J151
+                                                10T10
+                                                  J151
+                                                10T11
+                                                  J151
+                                                10T12
+                                                  J151
+                                                10T13
+                                                  J151
+                                                10T14
+                                                  J151
+                                                10T15
+                                                  J151
+                                                10T16
+                                                  J151
+                                                10T17
+                                                  J151
+                                                10T18
+                                                  J151
+                                                10T19
+                                                  J151
+      PHASE 2: GENERATE. W0 = FIRST     1
+      WORD; PRINT IT WITH J152 (PRINT   1
+      SYMBOL).                          1
+      PUSH FIRST WORD                           10T1
+      W0 = CURRENT WORD; POP                    20W0
+                                                11W0
+      PRINT IT                                    J152
+      STEP COUNTER W5 IS A FRESH COPY   1
+      (J120) OF THE CONSTANT ZERO N2, SO1
+      J125 (ADD 1) DOES NOT CHANGE THE  1
+      CONSTANT.                         1
+                                                10N2
+      J120: COPY OF ZERO                          J120
+      W5 = COUNTER = 0                          20W5
+      GENERATION LOOP, LABEL 9-2. J116  1
+      TESTS (0) < (1): PUSH THE LIMIT N11
+      FIRST, THEN THE COUNTER. 70 9-3   1
+      LEAVES THE LOOP WHEN THE TEST     1
+      FAILS (H5-).                      1
+      LOOP: PUSH LIMIT N1 (=(1))          9-2   10N1
+      PUSH COUNTER (=(0))                       11W5
+      J116: H5+ IF COUNTER < LIMIT                J116
+      IF H5-, DONE: GO 9-3                      709-3
+      G1: MAKE AND PRINT ONE WORD                 G1
+                                                11W5
+      J125: ADD 1 TO COUNTER, LEAVE (0)           J125
+      J8 POPS (0); GO BACK TO 9-2                 J8    9-2
+      9-3: HALT                           9-3     J7    0
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      --- G1: ONE GENERATION STEP ---   1
+      INPUT: W0 = CURRENT WORD. OUTPUT: 1
+      W0 = NEXT WORD, ALSO PRINTED.     1
+      THE CURRENT WORD'S OWN SYMBOL     1
+      NAMES ITS SUCCESSOR LIST. PUSH IT 1
+      TWICE: THE TOP COPY IS CONSUMED BY1
+      THE COUNT, THE LOWER COPY IS THE  1
+      LIST NAME (1) THAT J200 LATER     1
+      SEARCHES.                         1
+      PUSH CURRENT WORD = LIST NAME       G1    11W0
+      PUSH IT AGAIN                             11W0
+      J126: (0) = N, LENGTH OF LIST               J126
+      J129: (0) = RANDOM R, 0 <= R < N            J129
+      J125: R+1 (J200 COUNTS FROM 1)              J125
+      J200: (0) = THE (R+1)TH CELL                J200
+      J80: (0) = WORD IN THAT CELL                J80
+      W0 = NEXT WORD; POP                       20W0
+                                                11W0
+      PRINT IT; END OF G1                         J152  0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      DATA. CONSTANTS: N1 = NUMBER OF   1
+      WORDS TO GENERATE, N2 = ZERO.     1
+      N1 = STEPS                          N1    01         40
+      N2 = ZERO                           N2    01          0
+      SUCCESSOR LISTS, ONE PER WORD,    1
+      EMPTY UNTIL TRAINED: A HEAD CELL  1
+      NAMED BY THE WORD, LINK 0 = NO    1
+      CELLS.                            1
+      SUCCESSORS OF ONCE                  T1      0     0
+      SUCCESSORS OF UPON                  T2      0     0
+      SUCCESSORS OF A                     T3      0     0
+      SUCCESSORS OF MIDNIGHT              T4      0     0
+      SUCCESSORS OF DREARY                T5      0     0
+      SUCCESSORS OF WHILE                 T6      0     0
+      SUCCESSORS OF I                     T7      0     0
+      SUCCESSORS OF PONDERED              T8      0     0
+      SUCCESSORS OF WEAK                  T9      0     0
+      SUCCESSORS OF AND                   T10     0     0
+      SUCCESSORS OF WEARY                 T11     0     0
+      SUCCESSORS OF OVER                  T12     0     0
+      SUCCESSORS OF MANY                  T13     0     0
+      SUCCESSORS OF QUAINT                T14     0     0
+      SUCCESSORS OF CURIOUS               T15     0     0
+      SUCCESSORS OF VOLUME                T16     0     0
+      SUCCESSORS OF OF                    T17     0     0
+      SUCCESSORS OF FORGOTTEN             T18     0     0
+      SUCCESSORS OF LORE                  T19     0     0
+      THE TEXT, AS A LIST OF WORD       1
+      SYMBOLS, HEAD T39: ONCE UPON A    1
+      MIDNIGHT DREARY WHILE I PONDERED  1
+      WEAK AND WEARY OVER MANY A QUAINT 1
+      AND CURIOUS VOLUME OF FORGOTTEN   1
+      LORE                              1
+      TEXT LIST                           T39     0
+                                                  T1
+                                                  T2
+                                                  T3
+                                                  T4
+                                                  T5
+                                                  T6
+                                                  T7
+                                                  T8
+                                                  T9
+                                                  T10
+                                                  T11
+                                                  T12
+                                                  T13
+                                                  T3
+                                                  T14
+                                                  T10
+                                                  T15
+                                                  T16
+                                                  T17
+                                                  T18
+                                                  T19   0
+      START AT A0                       5         A0

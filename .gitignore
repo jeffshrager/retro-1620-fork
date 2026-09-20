@@ -24,3 +24,7 @@ $RECYCLE.BIN/
 # CLI harness trace/debug output (regenerable, can be huge) -- see
 # tools/cli/README.md's "Trace files" section.
 /traces/
+
+# Scanned/OCR copies of the copyrighted IPL-V manual and text extracted from it
+/software/IPL-V/raven/*.pdf
+/software/IPL-V/raven/manual*.txt

@@ -1,0 +1,266 @@
+      RAVEN4: TRAIN + GENERATE          9
+      BIGRAM MARKOV TEXT GENERATOR USING1
+      DESCRIPTION LISTS.                1
+      TEXT: FIRST 2 LINES OF THE RAVEN, 1
+      21 TOKENS, 19 DISTINCT WORDS (SEE 1
+      RAVEN4.VOCAB).                    1
+      EVERY WORD IS A REGIONAL SYMBOL   1
+      T1..T19, AND IS ALSO A DESCRIBABLE1
+      LIST (A HEAD CELL, INITIALLY      1
+      EMPTY).                           1
+      A WORD'S DESCRIPTION LIST HOLDS   1
+      ITS SUCCESSORS: EACH ATTRIBUTE IS 1
+      A WORD THAT FOLLOWED IT IN THE    1
+      TEXT, AND ITS VALUE IS AN INTEGER 1
+      DATA TERM COUNTING HOW OFTEN. ONLY1
+      SUCCESSORS ACTUALLY SEEN ARE      1
+      STORED, SO THE TABLE IS SPARSE.   1
+      PHASE 1 (TRAIN): FOR EACH ADJACENT1
+      PAIR (PREV, THIS) OF THE TEXT LIST1
+      T39, ADD 1 TO THE COUNT OF THIS IN1
+      PREV'S DESCRIPTION LIST, CREATING 1
+      IT WITH COUNT 1 IF IT IS NEW      1
+      (ROUTINE G2).                     1
+      PHASE 2 (GENERATE): REPEAT N      1
+      TIMES: J16 PICKS A SUCCESSOR OF   1
+      THE CURRENT WORD AT RANDOM,       1
+      WEIGHTED BY THE COUNTS (ROUTINE   1
+      G1).                              1
+      WORKING CELLS (W0-W2 ARE AVOIDED: 1
+      J11 AND OTHER LIBRARY ROUTINES    1
+      OVERWRITE THEM): W9 CURRENT WORD, 1
+      W4 PREVIOUS WORD, W6 CURRENT TEXT 1
+      CELL, W5 THIS WORD, W7 FIRST WORD,1
+      W8 STEP COUNTER.                  1
+      DEFINE REGIONS                    2 A0            2
+      LIST REGION                       2 L0            300
+      TOKEN REGION                      2 T0            40
+      ROUTINE REGION                    2 G0            4
+      NUMBER REGION                     2 N0            4
+      REGION L0 SUPPLIES CELLS FOR THE  1
+      PUSHDOWN STACK AND FOR THE        1
+      DESCRIPTION LISTS AND COUNTS BUILT1
+      DURING TRAINING.                  1
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      --- MAIN PROGRAM A0 ---           1
+      PHASE 1: TRAIN. START AT THE HEAD 1
+      CELL OF THE TEXT LIST AND STEP TO 1
+      ITS FIRST CELL WITH J60 (LOCATE   1
+      NEXT CELL).                       1
+      PUSH TEXT LIST HEAD T39             A0    10T39
+      J60: (0) = FIRST TEXT CELL                  J60
+      W6 = FIRST CELL; POP                      20W6
+      READ THE WORD IN THAT CELL WITH   1
+      J80 (SYMBOL IN CELL); IT IS THE   1
+      PREVIOUS WORD W4. KEEP A COPY IN  1
+      W7 SO THE LAST WORD CAN WRAP      1
+      AROUND TO THE FIRST.              1
+      PUSH CONTENTS OF W6 (THE CELL)            11W6
+      J80: (0) = WORD IN CELL                     J80
+      W4 = PREVIOUS WORD; POP                   20W4
+                                                11W4
+      W7 = FIRST WORD                           20W7
+      TRAINING LOOP, LABEL 9-1. STEP TO 1
+      THE NEXT TEXT CELL. J60 SETS H5+  1
+      IF THERE WAS ONE, H5- AT THE END  1
+      OF THE LIST; 70 9-9 BRANCHES TO   1
+      9-9 WHEN H5-.                     1
+      LOOP: PUSH CURRENT CELL             9-1   11W6
+      J60: (0) = NEXT CELL, SET H5                J60
+      IF H5-, TEXT ENDED: GO 9-9                709-9
+      W6 = NEXT CELL; POP                       20W6
+                                                11W6
+      (0) = WORD IN THAT CELL                     J80
+      W5 = THIS WORD; POP                       20W5
+      G2: COUNT PAIR (W4 -> W5)                   G2
+                                                11W5
+      W4 = W5; GO BACK TO 9-1                   20W4    9-1
+      9-9: TRAINING DONE. J60 LEFT THE  1
+      LAST CELL ON THE STACK WHEN IT    1
+      FAILED; J8 POPS IT. THEN CLOSE THE1
+      CYCLE BY COUNTING THE PAIR (LAST  1
+      WORD W4 -> FIRST WORD W7) SO NO   1
+      WORD IS A DEAD END.               1
+      POP LEFTOVER CELL                   9-9     J8
+                                                11W7
+      W5 = FIRST WORD                           20W5
+      G2: COUNT PAIR (W4 -> W5)                   G2
+      PRINT THE TRAINED TABLE: WALK THE 1
+      VOCABULARY LIST T38 (LOOP 9-6) AND1
+      PRINT EACH WORD WITH J150 (PRINT  1
+      LIST STRUCTURE), WHICH INCLUDES   1
+      ITS DESCRIPTION LIST.             1
+                                                10T38
+                                                  J60
+      W6 = FIRST VOCAB CELL                     20W6
+      PRINT LOOP: PUSH CELL               9-6   11W6
+      (0) = WORD IN CELL                          J80
+      J150: PRINT THE WORD'S LISTS                J150
+                                                11W6
+      NEXT VOCAB CELL                             J60
+      IF H5-, DONE: GO 9-7                      709-7
+      W6 = NEXT CELL; LOOP                      20W6    9-6
+      POP LEFTOVER CELL                   9-7     J8
+      PHASE 2: GENERATE. W9 = FIRST     1
+      WORD; PRINT IT WITH J152 (PRINT   1
+      SYMBOL).                          1
+      PUSH FIRST WORD                           10T1
+      W9 = CURRENT WORD; POP                    20W9
+                                                11W9
+      PRINT IT                                    J152
+      STEP COUNTER W8 IS A FRESH COPY   1
+      (J120) OF THE CONSTANT ZERO N2, SO1
+      J125 (ADD 1) DOES NOT CHANGE THE  1
+      CONSTANT.                         1
+                                                10N2
+      J120: COPY OF ZERO                          J120
+      W8 = COUNTER = 0                          20W8
+      GENERATION LOOP, LABEL 9-2. J116  1
+      TESTS (0) < (1): PUSH THE LIMIT N11
+      FIRST, THEN THE COUNTER. 70 9-3   1
+      LEAVES THE LOOP WHEN THE TEST     1
+      FAILS (H5-).                      1
+      LOOP: PUSH LIMIT N1 (=(1))          9-2   10N1
+      PUSH COUNTER (=(0))                       11W8
+      J116: H5+ IF COUNTER < LIMIT                J116
+      IF H5-, DONE: GO 9-3                      709-3
+      G1: MAKE AND PRINT ONE WORD                 G1
+                                                11W8
+      J125: ADD 1 TO COUNTER, LEAVE (0)           J125
+      J8 POPS (0); GO BACK TO 9-2                 J8    9-2
+      9-3: HALT                           9-3     J7    0
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      --- G1: ONE GENERATION STEP ---   1
+      INPUT: W9 = CURRENT WORD. OUTPUT: 1
+      W9 = NEXT WORD, ALSO PRINTED.     1
+      J16 TAKES A DESCRIBABLE LIST (THE 1
+      CURRENT WORD) AND RETURNS ONE OF  1
+      THE ATTRIBUTES OF ITS DESCRIPTION 1
+      LIST (A SUCCESSOR WORD), CHOSEN AT1
+      RANDOM WITH PROBABILITY           1
+      PROPORTIONAL TO THE INTEGER COUNT 1
+      VALUE.                            1
+      PUSH CURRENT WORD                   G1    11W9
+      J16: (0) = WEIGHTED RANDOM SUCCESS          J16
+      W9 = NEXT WORD; POP                       20W9
+                                                11W9
+      PRINT IT; END OF G1                         J152  0
+      ROUTINE HEADER. TYPE=5,Q=0.       5       00
+      --- G2: COUNT ONE BIGRAM ---      1
+      INPUT: W4 = PREVIOUS WORD, W5 =   1
+      THIS WORD. EFFECT: THE COUNT OF W51
+      IN W4'S DESCRIPTION LIST GOES UP  1
+      BY 1; IT IS CREATED WITH COUNT 1  1
+      IF W5 WAS NOT THERE.              1
+      J10 = FIND VALUE OF ATTRIBUTE (0) 1
+      OF LIST (1): PUSH THE LIST W4     1
+      FIRST, THEN THE ATTRIBUTE W5. IF  1
+      FOUND (H5+) THE VALUE, AN INTEGER 1
+      DATA TERM, IS LEFT AS (0); IF NOT 1
+      (H5-) NOTHING IS LEFT.            1
+      PUSH LIST = PREVIOUS WORD           G2    11W4
+      PUSH ATTRIBUTE = THIS WORD                11W5
+      J10: FIND COUNT; SET H5                     J10
+      IF H5- (NEW PAIR), GO 9-5                 709-5
+      FOUND: J125 ADDS 1 TO THE COUNT IN1
+      PLACE AND LEAVES IT AS (0); J8    1
+      POPS IT. THEN SKIP THE CREATE     1
+      STEP.                             1
+      J125: COUNT = COUNT + 1                     J125
+      POP COUNT; GO 9-6                           J8    9-6
+      9-5 NEW PAIR: J11 = ASSIGN (1) AS 1
+      VALUE OF ATTRIBUTE (0) OF LIST    1
+      (2). PUSH LIST W4, THEN A FRESH   1
+      COPY OF THE CONSTANT ONE N3 (J120 1
+      SO THE CONSTANT IS NOT SHARED),   1
+      THEN THE ATTRIBUTE W5. J11 CREATES1
+      THE DESCRIPTION LIST IF IT DOES   1
+      NOT EXIST YET.                    1
+      PUSH LIST (2)                       9-5   11W4
+                                                10N3
+      J120: NEW COUNT CELL = 1 (1)                J120
+      PUSH ATTRIBUTE (0)                        11W5
+      J11: ADD (W5 -> 1) TO W4                    J11   0
+      9-6: END OF G2 (NO-OP)              9-6     J0    0
+      DATA HEADER. TYPE=5,Q=1.          5       01
+      DATA. CONSTANTS: N1 = NUMBER OF   1
+      WORDS TO GENERATE, N2 = ZERO, N3 =1
+      ONE.                              1
+      N1 = STEPS                          N1    01         40
+      N2 = ZERO                           N2    01          0
+      N3 = ONE                            N3    01          1
+      WORD HEADS, ONE PER WORD: AN EMPTY1
+      DESCRIBABLE LIST (HEAD CELL, LINK 1
+      0) NAMED BY THE WORD SYMBOL. J11  1
+      FILLS IN THE DESCRIPTION LIST     1
+      DURING TRAINING.                  1
+      HEAD OF ONCE                        T1      0     0
+      HEAD OF UPON                        T2      0     0
+      HEAD OF A                           T3      0     0
+      HEAD OF MIDNIGHT                    T4      0     0
+      HEAD OF DREARY                      T5      0     0
+      HEAD OF WHILE                       T6      0     0
+      HEAD OF I                           T7      0     0
+      HEAD OF PONDERED                    T8      0     0
+      HEAD OF WEAK                        T9      0     0
+      HEAD OF AND                         T10     0     0
+      HEAD OF WEARY                       T11     0     0
+      HEAD OF OVER                        T12     0     0
+      HEAD OF MANY                        T13     0     0
+      HEAD OF QUAINT                      T14     0     0
+      HEAD OF CURIOUS                     T15     0     0
+      HEAD OF VOLUME                      T16     0     0
+      HEAD OF OF                          T17     0     0
+      HEAD OF FORGOTTEN                   T18     0     0
+      HEAD OF LORE                        T19     0     0
+      VOCABULARY LIST T38, USED ONLY TO 1
+      PRINT THE TABLE.                  1
+      VOCABULARY LIST                     T38     0
+                                                  T1
+                                                  T2
+                                                  T3
+                                                  T4
+                                                  T5
+                                                  T6
+                                                  T7
+                                                  T8
+                                                  T9
+                                                  T10
+                                                  T11
+                                                  T12
+                                                  T13
+                                                  T14
+                                                  T15
+                                                  T16
+                                                  T17
+                                                  T18
+                                                  T19   0
+      THE TEXT, AS A LIST OF WORD       1
+      SYMBOLS, HEAD T39: ONCE UPON A    1
+      MIDNIGHT DREARY WHILE I PONDERED  1
+      WEAK AND WEARY OVER MANY A QUAINT 1
+      AND CURIOUS VOLUME OF FORGOTTEN   1
+      LORE                              1
+      TEXT LIST                           T39     0
+                                                  T1
+                                                  T2
+                                                  T3
+                                                  T4
+                                                  T5
+                                                  T6
+                                                  T7
+                                                  T8
+                                                  T9
+                                                  T10
+                                                  T11
+                                                  T12
+                                                  T13
+                                                  T3
+                                                  T14
+                                                  T10
+                                                  T15
+                                                  T16
+                                                  T17
+                                                  T18
+                                                  T19   0
+      START AT A0                       5         A0
