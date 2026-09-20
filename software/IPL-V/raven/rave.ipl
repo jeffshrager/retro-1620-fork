@@ -1,52 +1,4 @@
       RAVEN4  TRAIN + GENERATE          9
-      BIGRAM MARKOV TEXT GENERATOR USING1
-      DESCRIPTION LISTS.                1
-      TEXT  FIRST 12 LINES OF THE RAVEN,1
-      115 TOKENS, 83 DISTINCT WORDS (SEE1
-      RAVEN4.VOCAB).                    1
-      EVERY WORD IS A REGIONAL SYMBOL   1
-      T1..T83, AND IS ALSO A DESCRIBABLE1
-      LIST (A HEAD CELL, INITIALLY      1
-      EMPTY).                           1
-      A WORD S DESCRIPTION LIST HOLDS   1
-      ITS SUCCESSORS  EACH ATTRIBUTE IS 1
-      A WORD THAT FOLLOWED IT IN THE    1
-      TEXT, AND ITS VALUE IS AN INTEGER 1
-      DATA TERM COUNTING HOW OFTEN. ONLY1
-      SUCCESSORS ACTUALLY SEEN ARE      1
-      STORED, SO THE TABLE IS SPARSE.   1
-      TEXT FOR OUTPUT  AN ALPHANUMERIC  1
-      DATA TERM HOLDS ONLY 5 CHARACTERS,1
-      SO EACH WORD IS SPELLED BY A LIST 1
-      YN OF PIECES V..  A FLAG CHARACTER1
-      PLUS UP TO 4 LETTERS, + FOR THE   1
-      FIRST PIECE OF A WORD AND - FOR A 1
-      CONTINUATION (POND ERED = +POND   1
-      -ERED). THE MAP TN -  YN IS THE   1
-      DESCRIPTION LIST OF ONE SEPARATE  1
-      DESCRIBABLE LIST X4. IT IS KEPT   1
-      OUT OF THE SUCCESSOR LISTS BECAUSE1
-      J16 TRAPS ON NON-NUMERIC VALUES.  1
-      G4 PRINTS ONE WORD BY PRINTING ITS1
-      PIECES  THE DECODER JOINS THEM.   1
-      PHASE 0 (LABEL)  ATTACH THE TEXT  1
-      TERMS. PHASE 1 (TRAIN)  FOR EACH  1
-      ADJACENT PAIR (PREV, THIS) OF THE 1
-      TEXT LIST X1, ADD 1 TO THE COUNT  1
-      OF THIS IN PREV S DESCRIPTION     1
-      LIST, CREATING IT WITH COUNT 1 IF 1
-      IT IS NEW (ROUTINE G2).           1
-      PHASE 2 (GENERATE)  REPEAT N      1
-      TIMES  J16 PICKS A SUCCESSOR OF   1
-      THE CURRENT WORD AT RANDOM,       1
-      WEIGHTED BY THE COUNTS (ROUTINE   1
-      G1).                              1
-      WORKING CELLS (W0-W2 ARE AVOIDED  1
-      J11 AND OTHER LIBRARY ROUTINES    1
-      OVERWRITE THEM)  W9 CURRENT WORD, 1
-      W4 PREVIOUS WORD, W6 CURRENT TEXT 1
-      CELL, W5 THIS WORD, W7 FIRST WORD,1
-      W8 STEP COUNTER.                  1
       DEFINE REGIONS                    2 A0            2
       LIST REGION                       2 L0            900
       TOKEN REGION                      2 T0            85
@@ -56,26 +8,7 @@
       TEXT-PIECE REGION                 2 V0            133
       PIECE-LIST REGION                 2 Y0            85
       ATTRIBUTE KEY REGION              2 K0            3
-      SIZES  T0/V0 = VOCABULARY + 2. X0 1
-      HOLDS THE THREE SUPPORT LISTS X1  1
-      (TEXT), X2 (WORDS), X3 (TEXT      1
-      TERMS). X4 IS THE WORD -  TEXT    1
-      MAP, K2 A TABLE SEPARATOR MARK.   1
-      REGION L0 SUPPLIES CELLS FOR THE  1
-      PUSHDOWN STACK AND FOR THE        1
-      DESCRIPTION LISTS AND COUNTS BUILT1
-      DURING TRAINING.                  1
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
-      --- MAIN PROGRAM A0 ---           1
-      PHASE 0  BUILD THE TEXT MAP. LIST 1
-      X2 HOLDS THE WORD SYMBOLS T1..T83 1
-      AND LIST X3 THE MATCHING PIECE    1
-      LISTS Y1..Y83 IN THE SAME ORDER.  1
-      WALK BOTH IN STEP AND DO J11 ON   1
-      LIST X4  ASSIGN (1) AS VALUE OF   1
-      ATTRIBUTE (0) OF LIST (2), I.E.   1
-      PUSH X4, THEN THE TEXT TERM, THEN 1
-      THE ATTRIBUTE.                    1
       PUSH WORD LIST X2                   A0    10X2
       J60  (0) = FIRST WORD CELL                  J60
       W3 = WORD CELL  POP                       20W3
@@ -96,28 +29,14 @@
                                                   J60
       NEXT TEXT CELL  LOOP                      20W6    9-4
       POP LEFTOVER CELL                   9-5     J8
-      PHASE 1  TRAIN. START AT THE HEAD 1
-      CELL OF THE TEXT LIST AND STEP TO 1
-      ITS FIRST CELL WITH J60 (LOCATE   1
-      NEXT CELL).                       1
       PUSH TEXT LIST HEAD X1                    10X1
       J60  (0) = FIRST TEXT CELL                  J60
       W6 = FIRST CELL  POP                      20W6
-      READ THE WORD IN THAT CELL WITH   1
-      J80 (SYMBOL IN CELL)  IT IS THE   1
-      PREVIOUS WORD W4. KEEP A COPY IN  1
-      W7 SO THE LAST WORD CAN WRAP      1
-      AROUND TO THE FIRST.              1
       PUSH CONTENTS OF W6 (THE CELL)            11W6
       J80  (0) = WORD IN CELL                     J80
       W4 = PREVIOUS WORD  POP                   20W4
                                                 11W4
       W7 = FIRST WORD                           20W7
-      TRAINING LOOP, LABEL 9-1. STEP TO 1
-      THE NEXT TEXT CELL. J60 SETS H5+  1
-      IF THERE WAS ONE, H5- AT THE END  1
-      OF THE LIST  70 9-9 BRANCHES TO   1
-      9-9 WHEN H5-.                     1
       LOOP  PUSH CURRENT CELL             9-1   11W6
       J60  (0) = NEXT CELL, SET H5                J60
       IF H5-, TEXT ENDED  GO 9-9                709-9
@@ -128,23 +47,10 @@
       G2  COUNT PAIR (W4 -  W5)                   G2
                                                 11W5
       W4 = W5  GO BACK TO 9-1                   20W4    9-1
-      9-9  TRAINING DONE. J60 LEFT THE  1
-      LAST CELL ON THE STACK WHEN IT    1
-      FAILED  J8 POPS IT. THEN CLOSE THE1
-      CYCLE BY COUNTING THE PAIR (LAST  1
-      WORD W4 -  FIRST WORD W7) SO NO   1
-      WORD IS A DEAD END.               1
       POP LEFTOVER CELL                   9-9     J8
                                                 11W7
       W5 = FIRST WORD                           20W5
       G2  COUNT PAIR (W4 -  W5)                   G2
-      PRINT THE CONTINUATION TABLE  FOR 1
-      EVERY WORD ON THE WORD LIST X2,   1
-      PRINT A SEPARATOR CARD (K2), THEN 1
-      CALL G3, WHICH PRINTS THE WORD    1
-      AND, FOR EACH SUCCESSOR, ITS TEXT 1
-      FOLLOWED BY ITS COUNT. A FINAL    1
-      SEPARATOR ENDS THE TABLE.         1
                                                 10X2
                                                   J60
       W3 = FIRST WORD CELL                      20W3
@@ -161,27 +67,15 @@
       POP LEFTOVER CELL                   9-7     J8
                                                 10K2
       PRINT END-OF-TABLE MARK ****                J152
-      PHASE 2  GENERATE. W9 = FIRST     1
-      WORD  PRINT IT WITH J152 (PRINT   1
-      SYMBOL).                          1
       PUSH FIRST WORD                           10T1
       W9 = CURRENT WORD  POP                    20W9
                                                 10X4
                                                 11W9
       J10  PIECE LIST OF WORD                     J10
       G4  PRINT ITS TEXT                          G4
-      STEP COUNTER W8 IS A FRESH COPY   1
-      (J120) OF THE CONSTANT ZERO N2, SO1
-      J125 (ADD 1) DOES NOT CHANGE THE  1
-      CONSTANT.                         1
                                                 10N2
       J120  COPY OF ZERO                          J120
       W8 = COUNTER = 0                          20W8
-      GENERATION LOOP, LABEL 9-2. J116  1
-      TESTS (0)   (1)  PUSH THE LIMIT N11
-      FIRST, THEN THE COUNTER. 70 9-3   1
-      LEAVES THE LOOP WHEN THE TEST     1
-      FAILS (H5-).                      1
       LOOP  PUSH LIMIT N1 (=(1))          9-2   10N1
       PUSH COUNTER (=(0))                       11W8
       J116  H5+ IF COUNTER   LIMIT                J116
@@ -192,19 +86,6 @@
       J8 POPS (0)  GO BACK TO 9-2                 J8    9-2
       9-3  HALT                           9-3     J7    0
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
-      --- G1  ONE GENERATION STEP ---   1
-      INPUT  W9 = CURRENT WORD. OUTPUT  1
-      W9 = NEXT WORD, AND ITS TEXT (J10 1
-      ON THE MAP X4 GIVES ITS PIECE     1
-      LIST, THEN G4 PRINTS IT) IS       1
-      PRINTED.                          1
-      J16 TAKES A DESCRIBABLE LIST (THE 1
-      CURRENT WORD) AND RETURNS ONE OF  1
-      THE ATTRIBUTES OF ITS DESCRIPTION 1
-      LIST (A SUCCESSOR WORD), CHOSEN AT1
-      RANDOM WITH PROBABILITY           1
-      PROPORTIONAL TO THE INTEGER COUNT 1
-      VALUE.                            1
       PUSH CURRENT WORD                   G1    11W9
       J16  (0) = WEIGHTED RANDOM SUCCESS          J16
       W9 = NEXT WORD  POP                       20W9
@@ -213,20 +94,6 @@
       J10  PIECE LIST OF NEW WORD                 J10
       G4  PRINT TEXT  END OF G1                   G4    0
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
-      --- G3  PRINT ONE WORD AND ITS    1
-      CONTINUATIONS ---                 1
-      INPUT  W9 = WORD. OUTPUT (ONE CARD1
-      EACH)  THE WORD S TEXT, THEN FOR  1
-      EVERY SUCCESSOR ITS TEXT AND ITS  1
-      COUNT.                            1
-      THE WORD S DESCRIPTION LIST IS    1
-      NAMED IN THE HEAD OF THE WORD S   1
-      LIST, SO J80 ON THE WORD GIVES IT.1
-      ITS CELLS ALTERNATE ATTRIBUTE (A  1
-      SUCCESSOR WORD), VALUE (ITS       1
-      COUNT), ATTRIBUTE, VALUE...       1
-      CELLS  W4 CURRENT DESCRIPTION-LIST1
-      CELL, W5 SUCCESSOR, W6 COUNT.     1
       PUSH MAP X4                         G3    10X4
                                                 11W9
       J10  PIECE LIST OF THE WORD                 J10
@@ -235,9 +102,6 @@
       J80  (0) = DESCRIPTION LIST NAME            J80
       J60  (0) = FIRST ATTRIBUTE CELL             J60
       W4 = ATTRIBUTE CELL  POP                  20W4
-      LOOP 9-3  READ THE SUCCESSOR (W5),1
-      STEP TO THE VALUE CELL AND READ   1
-      THE COUNT (W6), THEN PRINT BOTH.  1
       LOOP  PUSH ATTRIBUTE CELL           9-3   11W4
       (0) = SUCCESSOR SYMBOL                      J80
       W5 = SUCCESSOR                            20W5
@@ -259,15 +123,6 @@
       W4 = NEXT CELL  LOOP                      20W4    9-3
       POP LEFTOVER CELL  END OF G3        9-7     J8    0
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
-      --- G4  PRINT ONE WORD S TEXT --- 1
-      INPUT  (0) = THE WORD S PIECE LIST1
-      YN. OUTPUT  ONE CARD PER PIECE    1
-      (E.G. +POND THEN -ERED). J60 STEPS1
-      THROUGH THE LIST CELLS  J80 GIVES 1
-      THE PIECE (AN ALPHANUMERIC DATA   1
-      TERM) IN A CELL  J152 PRINTS IT.  1
-      CELL W7 HOLDS THE CURRENT LIST    1
-      CELL.                             1
       J60  (0) = FIRST PIECE CELL         G4      J60
       W7 = PIECE CELL  POP                      20W7
       LOOP  PUSH PIECE CELL               9-1   11W7
@@ -279,36 +134,12 @@
       W7 = NEXT CELL  LOOP                      20W7    9-1
       POP LEFTOVER CELL  END OF G4        9-2     J8    0
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
-      --- G2  COUNT ONE BIGRAM ---      1
-      INPUT  W4 = PREVIOUS WORD, W5 =   1
-      THIS WORD. EFFECT  THE COUNT OF W51
-      IN W4 S DESCRIPTION LIST GOES UP  1
-      BY 1  IT IS CREATED WITH COUNT 1  1
-      IF W5 WAS NOT THERE.              1
-      J10 = FIND VALUE OF ATTRIBUTE (0) 1
-      OF LIST (1)  PUSH THE LIST W4     1
-      FIRST, THEN THE ATTRIBUTE W5. IF  1
-      FOUND (H5+) THE VALUE, AN INTEGER 1
-      DATA TERM, IS LEFT AS (0)  IF NOT 1
-      (H5-) NOTHING IS LEFT.            1
       PUSH LIST = PREVIOUS WORD           G2    11W4
       PUSH ATTRIBUTE = THIS WORD                11W5
       J10  FIND COUNT  SET H5                     J10
       IF H5- (NEW PAIR), GO 9-5                 709-5
-      FOUND  J125 ADDS 1 TO THE COUNT IN1
-      PLACE AND LEAVES IT AS (0)  J8    1
-      POPS IT. THEN SKIP THE CREATE     1
-      STEP.                             1
       J125  COUNT = COUNT + 1                     J125
       POP COUNT  GO 9-6                           J8    9-6
-      9-5 NEW PAIR  J11 = ASSIGN (1) AS 1
-      VALUE OF ATTRIBUTE (0) OF LIST    1
-      (2). PUSH LIST W4, THEN A FRESH   1
-      COPY OF THE CONSTANT ONE N3 (J120 1
-      SO THE CONSTANT IS NOT SHARED),   1
-      THEN THE ATTRIBUTE W5. J11 CREATES1
-      THE DESCRIPTION LIST IF IT DOES   1
-      NOT EXIST YET.                    1
       PUSH LIST (2)                       9-5   11W4
                                                 10N3
       J120  NEW COUNT CELL = 1 (1)                J120
@@ -316,16 +147,10 @@
       J11  ADD (W5 -  1) TO W4                    J11   0
       9-6  END OF G2 (NO-OP)              9-6     J0    0
       DATA HEADER. TYPE=5,Q=1.          5       01
-      DATA. CONSTANTS  N1 = NUMBER OF   1
-      WORDS TO GENERATE, N2 = ZERO, N3 =1
-      ONE.                              1
       N1 = STEPS                          N1    01        100
       N2 = ZERO                           N2    01          0
       N3 = ONE                            N3    01          1
                                           K2    21****
-      TEXT PIECES  ALPHANUMERIC DATA    1
-      TERMS V1..V131 (SEE RAVEN4.VOCAB  1
-      FOR THE WORDS).                   1
                                           V1    21+ONCE
                                           V2    21+UPON
                                           V3    21+A
@@ -457,9 +282,6 @@
                                           V129  21+HERE
                                           V130  21+EVER
                                           V131  21-MORE
-      PIECE LISTS Y1..Y83, ONE PER WORD 1
-      IN VOCABULARY ORDER  EACH LISTS   1
-      THE PIECES THAT SPELL THE WORD.   1
       SPELLING OF ONCE                    Y1      0
                                                   V1    0
       SPELLING OF UPON                    Y2      0
@@ -674,9 +496,6 @@
       SPELLING OF EVERMORE                Y83     0
                                                   V130
                                                   V131  0
-      LIST X3 = PIECE LISTS Y1..Y83,    1
-      LIST X2 = WORD SYMBOLS, IN THE    1
-      SAME ORDER.                       1
       PIECE-LIST LIST                     X3      0
                                                   Y1
                                                   Y2
@@ -845,11 +664,6 @@
                                                   T81
                                                   T82
                                                   T83   0
-      WORD HEADS, ONE PER WORD  AN EMPTY1
-      DESCRIBABLE LIST (HEAD CELL, LINK 1
-      0) NAMED BY THE WORD SYMBOL. J11  1
-      FILLS IN THE DESCRIPTION LIST     1
-      DURING TRAINING.                  1
       HEAD OF ONCE                        T1      0     0
       HEAD OF UPON                        T2      0     0
       HEAD OF A                           T3      0     0
@@ -933,32 +747,7 @@
       HEAD OF NAMELESS                    T81     0     0
       HEAD OF HERE                        T82     0     0
       HEAD OF EVERMORE                    T83     0     0
-      THE MAP LIST X4  EMPTY HEAD  ITS  1
-      DESCRIPTION LIST IS BUILT BY PHASE1
-      0.                                1
       MAP LIST                            X4      0     0
-      THE TEXT, AS A LIST OF WORD       1
-      SYMBOLS, HEAD X1  ONCE UPON A     1
-      MIDNIGHT DREARY WHILE I PONDERED  1
-      WEAK AND WEARY OVER MANY A QUAINT 1
-      AND CURIOUS VOLUME OF FORGOTTEN   1
-      LORE WHILE I NODDED NEARLY NAPPING1
-      SUDDENLY THERE CAME A TAPPING AS  1
-      OF SOME ONE GENTLY RAPPING RAPPING1
-      AT MY CHAMBER DOOR  TIS SOME      1
-      VISITER I MUTTERED TAPPING AT MY  1
-      CHAMBER DOOR ONLY THIS AND NOTHING1
-      MORE AH DISTINCTLY I REMEMBER IT  1
-      WAS IN THE BLEAK DECEMBER AND EACH1
-      SEPARATE DYING EMBER WROUGHT ITS  1
-      GHOST UPON THE FLOOR EAGERLY I    1
-      WISHED THE MORROW VAINLY I HAD    1
-      SOUGHT TO BORROW FROM MY BOOKS    1
-      SURCEASE OF SORROW SORROW FOR THE 1
-      LOST LENORE FOR THE RARE AND      1
-      RADIANT MAIDEN WHOM THE ANGELS    1
-      NAME LENORE NAMELESS HERE FOR     1
-      EVERMORE                          1
       TEXT LIST                           X1      0
                                                   T1
                                                   T2

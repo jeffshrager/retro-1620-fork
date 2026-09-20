@@ -114,9 +114,14 @@ function loadHopper(files) {
             lines.pop();             // drop the trailing empty line from a final newline
         }
 
-        for (const line of lines) {
+        lines.forEach((line, i) => {
             hopper.push(line);
-        }
+            // Same character set the GUI card reader accepts (CardReader.invalidCharRex).
+            const bad = line.match(/[^A-Z0-9 .)+$*\-/,(=@|}!"\]]/g);
+            if (bad) {
+                console.error(`WARNING: ${file}:${i+1}: invalid card character(s) ${[...new Set(bad)].map(c => JSON.stringify(c)).join(" ")} (the GUI card reader will choke)`);
+            }
+        });
     }
 
     return hopper;

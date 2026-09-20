@@ -5,6 +5,53 @@ logged, traces under `traces/` at the repo root.
 
 ---
 
+## 2026-09-22 (later) -- GUI: use the Mod-3-4 decks (`K2 ??+ ****`, arithmetic check)
+
+After the character fix, the GUI loaded and trained, then punched one card `K2 ??+
+****` and halted with an arithmetic check. That is the **Punch-Check symptom of the
+original interpreter** (TNF odd-address bug: numeric/type fields print as `??+`) --
+Jeff was loading the *original* decks. Reproduced in the CLI: original Deck-1/Deck-2
+give `K2 ??+ ****`, `V1 ??+ +ONCE`, ...; the **Mod-3-4** decks print correctly. All my
+runs (`traces/runraven.sh`) always used Mod-3-4 but I never told Jeff. Note: the
+original decks also print `TYPE9 + 3 OVERLAP` at load, so the first GUI error report was
+probably at least partly the unpatched deck, not only the `:` characters -- both fixes
+are needed. Wrote `raven/README.txt` with the exact deck order.
+
+---
+
+## 2026-09-22 -- GUI hang: invalid card characters in comments (`:` `;` `<` `>` `[` `]` `'` and lowercase)
+
+Jeff, running `rave.ipl` in the browser GUI: `TYPE9 + 3 OVERLAP` on the title card,
+then a hang "compiling the J60 right after A0" (also not a memory-size problem: same at
+40K and 60K). Not reproduced by the CLI, because the CLI card reader silently passes
+characters the GUI reader rejects. The GUI's `CardReader.invalidCharRex` allows only
+`A-Z 0-9 space . ) + $ * - / , ( = @ | } ! " ]` (uppercase only). My generated
+comments used `:` (`RAVEN4: ...`, `J60: (0) = ...` -- exactly the card that hung),
+plus `;` `<` `>` `[` `]` `'` and a lowercase `n`.
+
+**Fix:** `mkdeck.py` now uppercases comment text and turns any other character into a
+space (`card()` and `const()`); `raven4.ipl`/`rave.ipl` regenerated and re-verified in
+the CLI (0 traps, identical output). **CLI now warns** when any loaded card contains a
+character the GUI reader would reject (`run1620.mjs`, `WARNING: file:line: invalid card
+character(s)`). Older probe files (`raven2*`, `raven3`, `raven4a-c`, `raven5a`, `simple7`,
+`hold_8`) still contain `:` etc.; they run in the CLI but not in the GUI. Not confirmed on
+the actual GUI (no access) -- pending Jeff's test.
+
+---
+
+## 2026-09-21 (later still) -- `rave.ipl`: same program without the type-1 comment cards
+
+`mkdeck.py --no-comments --out=rave.ipl` (new flags; `--out` defaults to
+`raven4.ipl`). Comments (type-1 cards) are ignored by the loader, so the program
+is identical: 867 cards instead of 1078 (211 fewer, 20%). Verified same behavior:
+0 traps, clean halt, byte-identical generated text and table. **Headless CLI run
+time is barely different (30.3 s vs 31.3 s)** because the time is dominated by
+executing the program (train + 100 steps + table), not by reading cards; the saving
+matters for the real-time card reader in the browser UI. Regenerate with
+`python3 mkdeck.py [nlines] [steps] --no-comments --out=rave.ipl`.
+
+---
+
 ## 2026-09-21 (later) -- full words instead of 4-letter abbreviations
 
 An alphanumeric data term holds only 5 chars, so each word is now a **list of

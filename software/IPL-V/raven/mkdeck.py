@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Tokenize the first N lines of raven.txt and emit raven3.ipl (+ raven3.vocab).
-usage: mkdeck.py [nlines=12] [steps=100] [--lspace=900] [--no-table]   (writes raven4.ipl)
+usage: mkdeck.py [nlines=12] [steps=100] [--lspace=900] [--no-table] [--no-comments] [--out=raven4.ipl]
 Words -> regional symbols T1..Tn (first-seen order); the text is a data list X1;
 each word gets an empty successor list named by its own symbol. The IPL-V
 program trains (appends each word to its predecessor's list) and generates.
@@ -11,12 +11,14 @@ def card(comment="", typ="", name="", pq="", symb="", link=""):
     s = [" "] * 80
     def put(col, txt):
         for i, c in enumerate(txt): s[col - 1 + i] = c
+    comment = re.sub(r"[^A-Z0-9.)*$(,=@+\-/ ]", " ", comment.upper())   # only characters the 1620 card reader accepts
     put(7, comment[:34]); put(41, typ); put(43, name); put(49, pq); put(51, symb)
     if link != "": put(57, link)
     return "".join(s).rstrip()
 
 def const(comment, name, value):            # integer data term, value right-justified to col 61
     s = [" "] * 80
+    comment = re.sub(r"[^A-Z0-9.)*$(,=@+\-/ ]", " ", comment.upper())
     for i, c in enumerate(comment[:34]): s[6 + i] = c
     s[42], s[43], s[48], s[49] = name[0], name[1], "0", "1"
     v = str(value)
@@ -25,6 +27,8 @@ def const(comment, name, value):            # integer data term, value right-jus
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 table = "--no-table" not in sys.argv
+nocomm = "--no-comments" in sys.argv        # omit the type-1 comment cards (faster loading)
+out = ([a.split("=")[1] for a in sys.argv if a.startswith("--out=")] or ["raven4.ipl"])[0]
 lspace = int(([a.split("=")[1] for a in sys.argv if a.startswith("--lspace=")] or ["900"])[0])
 nlines = int(args[0]) if len(args) > 0 else 12
 steps = int(args[1]) if len(args) > 1 else 100
@@ -52,6 +56,7 @@ def alnum(name, text):                       # alphanumeric data term: PQ=21, <=
 
 L = []
 def C(*paras):                               # type-1 comment cards, wrapped to 34 cols
+    if nocomm: return
     for p in paras:
         for ln in textwrap.wrap(p, 34) or [""]: L.append(card(ln, typ="1"))
 def I(pq="", symb="", name="", link="", c=""):
@@ -225,5 +230,5 @@ L.append(card("TEXT LIST", name="X1", symb="0"))
 for k, t in enumerate(text):
     L.append(card("", symb=t, link="0" if k == len(text) - 1 else ""))
 L.append(card("START AT A0", typ="5", symb="A0"))
-open("raven4.ipl", "w").write("\n".join(L) + "\n")
-print(len(words), "tokens,", len(vocab), "distinct,", steps, "steps ->", "raven4.ipl", len(L), "cards")
+open(out, "w").write("\n".join(L) + "\n")
+print(len(words), "tokens,", len(vocab), "distinct,", steps, "steps ->", out, len(L), "cards")
