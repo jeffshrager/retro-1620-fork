@@ -15,12 +15,19 @@
       DATA TERM COUNTING HOW OFTEN. ONLY1
       SUCCESSORS ACTUALLY SEEN ARE      1
       STORED, SO THE TABLE IS SPARSE.   1
-      PHASE 1 (TRAIN): FOR EACH ADJACENT1
-      PAIR (PREV, THIS) OF THE TEXT LIST1
-      T39, ADD 1 TO THE COUNT OF THIS IN1
-      PREV'S DESCRIPTION LIST, CREATING 1
-      IT WITH COUNT 1 IF IT IS NEW      1
-      (ROUTINE G2).                     1
+      EACH WORD SYMBOL Tn ALSO HAS      1
+      ATTRIBUTE K1 WHOSE VALUE IS A     1
+      4-LETTER ALPHANUMERIC DATA TERM Vn1
+      (E.G. ONCE) SO THAT OUTPUT SHOWS  1
+      THE WORD. J16 IGNORES IT BECAUSE  1
+      IT ONLY WEIGHS NUMERIC VALUES.    1
+      PHASE 0 (LABEL): ATTACH THE TEXT  1
+      TERMS. PHASE 1 (TRAIN): FOR EACH  1
+      ADJACENT PAIR (PREV, THIS) OF THE 1
+      TEXT LIST T39, ADD 1 TO THE COUNT 1
+      OF THIS IN PREV'S DESCRIPTION     1
+      LIST, CREATING IT WITH COUNT 1 IF 1
+      IT IS NEW (ROUTINE G2).           1
       PHASE 2 (GENERATE): REPEAT N      1
       TIMES: J16 PICKS A SUCCESSOR OF   1
       THE CURRENT WORD AT RANDOM,       1
@@ -37,17 +44,47 @@
       TOKEN REGION                      2 T0            40
       ROUTINE REGION                    2 G0            4
       NUMBER REGION                     2 N0            4
+      WORD-TEXT REGION                  2 V0            40
+      ATTRIBUTE KEY REGION              2 K0            2
       REGION L0 SUPPLIES CELLS FOR THE  1
       PUSHDOWN STACK AND FOR THE        1
       DESCRIPTION LISTS AND COUNTS BUILT1
       DURING TRAINING.                  1
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
       --- MAIN PROGRAM A0 ---           1
+      PHASE 0: LABEL THE WORDS. LIST T381
+      HOLDS THE WORD SYMBOLS T1..T19 AND1
+      LIST T37 THE MATCHING TEXT TERMS  1
+      V1..V19 IN THE SAME ORDER. WALK   1
+      BOTH IN STEP AND DO J11: ASSIGN   1
+      (1) AS VALUE OF ATTRIBUTE (0) OF  1
+      LIST (2), I.E. PUSH THE WORD, THEN1
+      ITS TEXT TERM, THEN THE KEY K1.   1
+      PUSH WORD LIST T38                  A0    10T38
+      J60: (0) = FIRST WORD CELL                  J60
+      W3 = WORD CELL; POP                       20W3
+                                                10T37
+      (0) = FIRST TEXT-TERM CELL                  J60
+      W6 = TEXT CELL; POP                       20W6
+      LABEL LOOP: PUSH WORD CELL          9-4   11W3
+      (0) = WORD SYMBOL (LIST (2))                J80
+                                                11W6
+      (0) = TEXT TERM (VALUE (1))                 J80
+      PUSH KEY K1 (ATTRIBUTE (0))               10K1
+      J11: WORD[K1] = TEXT TERM                   J11
+                                                11W3
+      NEXT WORD CELL                              J60
+      IF H5-, ALL LABELLED: GO 9-5              709-5
+      W3 = NEXT WORD CELL                       20W3
+                                                11W6
+                                                  J60
+      NEXT TEXT CELL; LOOP                      20W6    9-4
+      POP LEFTOVER CELL                   9-5     J8
       PHASE 1: TRAIN. START AT THE HEAD 1
       CELL OF THE TEXT LIST AND STEP TO 1
       ITS FIRST CELL WITH J60 (LOCATE   1
       NEXT CELL).                       1
-      PUSH TEXT LIST HEAD T39             A0    10T39
+      PUSH TEXT LIST HEAD T39                   10T39
       J60: (0) = FIRST TEXT CELL                  J60
       W6 = FIRST CELL; POP                      20W6
       READ THE WORD IN THAT CELL WITH   1
@@ -107,7 +144,9 @@
       PUSH FIRST WORD                           10T1
       W9 = CURRENT WORD; POP                    20W9
                                                 11W9
-      PRINT IT                                    J152
+                                                10K1
+      J10: TEXT TERM OF WORD                      J10
+      PRINT ITS TEXT                              J152
       STEP COUNTER W8 IS A FRESH COPY   1
       (J120) OF THE CONSTANT ZERO N2, SO1
       J125 (ADD 1) DOES NOT CHANGE THE  1
@@ -132,7 +171,9 @@
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
       --- G1: ONE GENERATION STEP ---   1
       INPUT: W9 = CURRENT WORD. OUTPUT: 1
-      W9 = NEXT WORD, ALSO PRINTED.     1
+      W9 = NEXT WORD, AND ITS 4-LETTER  1
+      TEXT (J10 ON ATTRIBUTE K1, THEN   1
+      J152) IS PRINTED.                 1
       J16 TAKES A DESCRIBABLE LIST (THE 1
       CURRENT WORD) AND RETURNS ONE OF  1
       THE ATTRIBUTES OF ITS DESCRIPTION 1
@@ -144,7 +185,9 @@
       J16: (0) = WEIGHTED RANDOM SUCCESS          J16
       W9 = NEXT WORD; POP                       20W9
                                                 11W9
-      PRINT IT; END OF G1                         J152  0
+                                                10K1
+      J10: TEXT TERM OF NEW WORD                  J10
+      PRINT ITS TEXT; END OF G1                   J152  0
       ROUTINE HEADER. TYPE=5,Q=0.       5       00
       --- G2: COUNT ONE BIGRAM ---      1
       INPUT: W4 = PREVIOUS WORD, W5 =   1
@@ -189,6 +232,71 @@
       N1 = STEPS                          N1    01         40
       N2 = ZERO                           N2    01          0
       N3 = ONE                            N3    01          1
+      TEXT TERMS: ALPHANUMERIC DATA     1
+      TERMS Vn HOLDING EACH WORD'S      1
+      4-LETTER ABBREVIATION (SEE        1
+      RAVEN4.VOCAB).                    1
+                                          V1    21ONCE
+                                          V2    21UPON
+                                          V3    21A
+                                          V4    21MIDN
+                                          V5    21DREA
+                                          V6    21WHIL
+                                          V7    21I
+                                          V8    21POND
+                                          V9    21WEAK
+                                          V10   21AND
+                                          V11   21WEAR
+                                          V12   21OVER
+                                          V13   21MANY
+                                          V14   21QUAI
+                                          V15   21CURI
+                                          V16   21VOLU
+                                          V17   21OF
+                                          V18   21FORG
+                                          V19   21LORE
+      LIST T37 = TEXT TERMS, LIST T38 = 1
+      WORD SYMBOLS, IN THE SAME ORDER.  1
+      TEXT-TERM LIST                      T37     0
+                                                  V1
+                                                  V2
+                                                  V3
+                                                  V4
+                                                  V5
+                                                  V6
+                                                  V7
+                                                  V8
+                                                  V9
+                                                  V10
+                                                  V11
+                                                  V12
+                                                  V13
+                                                  V14
+                                                  V15
+                                                  V16
+                                                  V17
+                                                  V18
+                                                  V19   0
+      WORD LIST                           T38     0
+                                                  T1
+                                                  T2
+                                                  T3
+                                                  T4
+                                                  T5
+                                                  T6
+                                                  T7
+                                                  T8
+                                                  T9
+                                                  T10
+                                                  T11
+                                                  T12
+                                                  T13
+                                                  T14
+                                                  T15
+                                                  T16
+                                                  T17
+                                                  T18
+                                                  T19   0
       WORD HEADS, ONE PER WORD: AN EMPTY1
       DESCRIBABLE LIST (HEAD CELL, LINK 1
       0) NAMED BY THE WORD SYMBOL. J11  1
@@ -213,28 +321,6 @@
       HEAD OF OF                          T17     0     0
       HEAD OF FORGOTTEN                   T18     0     0
       HEAD OF LORE                        T19     0     0
-      VOCABULARY LIST T38, USED ONLY TO 1
-      PRINT THE TABLE.                  1
-      VOCABULARY LIST                     T38     0
-                                                  T1
-                                                  T2
-                                                  T3
-                                                  T4
-                                                  T5
-                                                  T6
-                                                  T7
-                                                  T8
-                                                  T9
-                                                  T10
-                                                  T11
-                                                  T12
-                                                  T13
-                                                  T14
-                                                  T15
-                                                  T16
-                                                  T17
-                                                  T18
-                                                  T19   0
       THE TEXT, AS A LIST OF WORD       1
       SYMBOLS, HEAD T39: ONCE UPON A    1
       MIDNIGHT DREARY WHILE I PONDERED  1

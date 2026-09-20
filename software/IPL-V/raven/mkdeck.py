@@ -32,8 +32,21 @@ words = re.findall(r"[a-z']+", " ".join(lines).lower())
 vocab = {}
 for w in words: vocab.setdefault(w, "T%d" % (len(vocab) + 1))
 text = [vocab[w] for w in words]
-assert len(vocab) < 39
-open("raven4.vocab", "w").write("\n".join("%s %s" % (v, w) for w, v in vocab.items()) + "\n")
+assert len(vocab) < 37
+abbr, used = {}, set()                       # 4-letter stand-in for each word, unique
+for w in vocab:
+    a = re.sub(r"[^a-z]", "", w)[:4].upper()
+    k = 0
+    while a in used:
+        k += 1; a = (re.sub(r"[^a-z]", "", w)[:3].upper() + str(k))[:4]
+    used.add(a); abbr[w] = a
+open("raven4.vocab", "w").write("\n".join("%s %s %s" % (v, abbr[w], w) for w, v in vocab.items()) + "\n")
+
+def alnum(name, text):                       # alphanumeric data term: PQ=21, <=5 chars in the SYMB field
+    s = [" "] * 80; s[48], s[49] = "2", "1"
+    for i, c in enumerate(name): s[42 + i] = c
+    for i, c in enumerate(text[:5]): s[50 + i] = c
+    return "".join(s).rstrip()
 
 L = []
 def C(*paras):                               # type-1 comment cards, wrapped to 34 cols
@@ -47,20 +60,39 @@ C("BIGRAM MARKOV TEXT GENERATOR USING DESCRIPTION LISTS.",
   "TEXT: FIRST %d LINES OF THE RAVEN, %d TOKENS, %d DISTINCT WORDS (SEE RAVEN4.VOCAB)." % (nlines, len(words), len(vocab)),
   "EVERY WORD IS A REGIONAL SYMBOL T1..T%d, AND IS ALSO A DESCRIBABLE LIST (A HEAD CELL, INITIALLY EMPTY)." % len(vocab),
   "A WORD'S DESCRIPTION LIST HOLDS ITS SUCCESSORS: EACH ATTRIBUTE IS A WORD THAT FOLLOWED IT IN THE TEXT, AND ITS VALUE IS AN INTEGER DATA TERM COUNTING HOW OFTEN. ONLY SUCCESSORS ACTUALLY SEEN ARE STORED, SO THE TABLE IS SPARSE.",
-  "PHASE 1 (TRAIN): FOR EACH ADJACENT PAIR (PREV, THIS) OF THE TEXT LIST T39, ADD 1 TO THE COUNT OF THIS IN PREV'S DESCRIPTION LIST, CREATING IT WITH COUNT 1 IF IT IS NEW (ROUTINE G2).",
+  "EACH WORD SYMBOL Tn ALSO HAS ATTRIBUTE K1 WHOSE VALUE IS A 4-LETTER ALPHANUMERIC DATA TERM Vn (E.G. ONCE) SO THAT OUTPUT SHOWS THE WORD. J16 IGNORES IT BECAUSE IT ONLY WEIGHS NUMERIC VALUES.",
+  "PHASE 0 (LABEL): ATTACH THE TEXT TERMS. PHASE 1 (TRAIN): FOR EACH ADJACENT PAIR (PREV, THIS) OF THE TEXT LIST T39, ADD 1 TO THE COUNT OF THIS IN PREV'S DESCRIPTION LIST, CREATING IT WITH COUNT 1 IF IT IS NEW (ROUTINE G2).",
   "PHASE 2 (GENERATE): REPEAT N TIMES: J16 PICKS A SUCCESSOR OF THE CURRENT WORD AT RANDOM, WEIGHTED BY THE COUNTS (ROUTINE G1).",
   "WORKING CELLS (W0-W2 ARE AVOIDED: J11 AND OTHER LIBRARY ROUTINES OVERWRITE THEM): W9 CURRENT WORD, W4 PREVIOUS WORD, W6 CURRENT TEXT CELL, W5 THIS WORD, W7 FIRST WORD, W8 STEP COUNTER.")
 L += [card("DEFINE REGIONS", typ="2", name="A0", link="2"),
       card("LIST REGION", typ="2", name="L0", link="300"),
       card("TOKEN REGION", typ="2", name="T0", link="40"),
       card("ROUTINE REGION", typ="2", name="G0", link="4"),
-      card("NUMBER REGION", typ="2", name="N0", link="4")]
+      card("NUMBER REGION", typ="2", name="N0", link="4"),
+      card("WORD-TEXT REGION", typ="2", name="V0", link="40"),
+      card("ATTRIBUTE KEY REGION", typ="2", name="K0", link="2")]
 C("REGION L0 SUPPLIES CELLS FOR THE PUSHDOWN STACK AND FOR THE DESCRIPTION LISTS AND COUNTS BUILT DURING TRAINING.")
 L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
 
-C("--- MAIN PROGRAM A0 ---",
-  "PHASE 1: TRAIN. START AT THE HEAD CELL OF THE TEXT LIST AND STEP TO ITS FIRST CELL WITH J60 (LOCATE NEXT CELL).")
-I("10", "T39", "A0", c="PUSH TEXT LIST HEAD T39")
+C("--- MAIN PROGRAM A0 ---")
+C("--- MAIN PROGRAM A0 ---" if False else "PHASE 0: LABEL THE WORDS. LIST T38 HOLDS THE WORD SYMBOLS T1..T%d AND LIST T37 THE MATCHING TEXT TERMS V1..V%d IN THE SAME ORDER. WALK BOTH IN STEP AND DO J11: ASSIGN (1) AS VALUE OF ATTRIBUTE (0) OF LIST (2), I.E. PUSH THE WORD, THEN ITS TEXT TERM, THEN THE KEY K1." % (len(vocab), len(vocab)))
+I("10", "T38", "A0", c="PUSH WORD LIST T38")
+I(symb="J60", c="J60: (0) = FIRST WORD CELL")
+I("20", "W3", c="W3 = WORD CELL; POP")
+I("10", "T37"); I(symb="J60", c="(0) = FIRST TEXT-TERM CELL")
+I("20", "W6", c="W6 = TEXT CELL; POP")
+I("11", "W3", "9-4", c="LABEL LOOP: PUSH WORD CELL")
+I(symb="J80", c="(0) = WORD SYMBOL (LIST (2))")
+I("11", "W6"); I(symb="J80", c="(0) = TEXT TERM (VALUE (1))")
+I("10", "K1", c="PUSH KEY K1 (ATTRIBUTE (0))")
+I(symb="J11", c="J11: WORD[K1] = TEXT TERM")
+I("11", "W3"); I(symb="J60", c="NEXT WORD CELL")
+I("70", "9-5", c="IF H5-, ALL LABELLED: GO 9-5")
+I("20", "W3", c="W3 = NEXT WORD CELL")
+I("11", "W6"); I(symb="J60"); I("20", "W6", link="9-4", c="NEXT TEXT CELL; LOOP")
+I(symb="J8", name="9-5", c="POP LEFTOVER CELL")
+C("PHASE 1: TRAIN. START AT THE HEAD CELL OF THE TEXT LIST AND STEP TO ITS FIRST CELL WITH J60 (LOCATE NEXT CELL).")
+I("10", "T39", c="PUSH TEXT LIST HEAD T39")
 I(symb="J60", c="J60: (0) = FIRST TEXT CELL")
 I("20", "W6", c="W6 = FIRST CELL; POP")
 C("READ THE WORD IN THAT CELL WITH J80 (SYMBOL IN CELL); IT IS THE PREVIOUS WORD W4. KEEP A COPY IN W7 SO THE LAST WORD CAN WRAP AROUND TO THE FIRST.")
@@ -93,7 +125,7 @@ if table:
     I(symb="J8", name="9-7", c="POP LEFTOVER CELL")
 C("PHASE 2: GENERATE. W9 = FIRST WORD; PRINT IT WITH J152 (PRINT SYMBOL).")
 I("10", text[0], c="PUSH FIRST WORD"); I("20", "W9", c="W9 = CURRENT WORD; POP")
-I("11", "W9"); I(symb="J152", c="PRINT IT")
+I("11", "W9"); I("10", "K1"); I(symb="J10", c="J10: TEXT TERM OF WORD"); I(symb="J152", c="PRINT ITS TEXT")
 C("STEP COUNTER W8 IS A FRESH COPY (J120) OF THE CONSTANT ZERO N2, SO J125 (ADD 1) DOES NOT CHANGE THE CONSTANT.")
 I("10", "N2"); I(symb="J120", c="J120: COPY OF ZERO"); I("20", "W8", c="W8 = COUNTER = 0")
 C("GENERATION LOOP, LABEL 9-2. J116 TESTS (0) < (1): PUSH THE LIMIT N1 FIRST, THEN THE COUNTER. 70 9-3 LEAVES THE LOOP WHEN THE TEST FAILS (H5-).")
@@ -108,12 +140,12 @@ I(symb="J7", name="9-3", link="0", c="9-3: HALT")
 
 L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
 C("--- G1: ONE GENERATION STEP ---",
-  "INPUT: W9 = CURRENT WORD. OUTPUT: W9 = NEXT WORD, ALSO PRINTED.",
+  "INPUT: W9 = CURRENT WORD. OUTPUT: W9 = NEXT WORD, AND ITS 4-LETTER TEXT (J10 ON ATTRIBUTE K1, THEN J152) IS PRINTED.",
   "J16 TAKES A DESCRIBABLE LIST (THE CURRENT WORD) AND RETURNS ONE OF THE ATTRIBUTES OF ITS DESCRIPTION LIST (A SUCCESSOR WORD), CHOSEN AT RANDOM WITH PROBABILITY PROPORTIONAL TO THE INTEGER COUNT VALUE.")
 I("11", "W9", "G1", c="PUSH CURRENT WORD")
 I(symb="J16", c="J16: (0) = WEIGHTED RANDOM SUCCESSOR")
 I("20", "W9", c="W9 = NEXT WORD; POP")
-I("11", "W9"); I(symb="J152", link="0", c="PRINT IT; END OF G1")
+I("11", "W9"); I("10", "K1"); I(symb="J10", c="J10: TEXT TERM OF NEW WORD"); I(symb="J152", link="0", c="PRINT ITS TEXT; END OF G1")
 
 L.append(card("ROUTINE HEADER. TYPE=5,Q=0.", typ="5", pq="00"))
 C("--- G2: COUNT ONE BIGRAM ---",
@@ -136,14 +168,16 @@ I(symb="J0", name="9-6", link="0", c="9-6: END OF G2 (NO-OP)")
 L.append(card("DATA HEADER. TYPE=5,Q=1.", typ="5", pq="01"))
 C("DATA. CONSTANTS: N1 = NUMBER OF WORDS TO GENERATE, N2 = ZERO, N3 = ONE.")
 L.append(const("N1 = STEPS", "N1", steps)); L.append(const("N2 = ZERO", "N2", 0)); L.append(const("N3 = ONE", "N3", 1))
+C("TEXT TERMS: ALPHANUMERIC DATA TERMS Vn HOLDING EACH WORD'S 4-LETTER ABBREVIATION (SEE RAVEN4.VOCAB).")
+for i, (w, v) in enumerate(vocab.items(), 1): L.append(alnum("V%d" % i, abbr[w]))
+C("LIST T37 = TEXT TERMS, LIST T38 = WORD SYMBOLS, IN THE SAME ORDER.")
+L.append(card("TEXT-TERM LIST", name="T37", symb="0"))
+for k in range(1, len(vocab) + 1): L.append(card("", symb="V%d" % k, link="0" if k == len(vocab) else ""))
+L.append(card("WORD LIST", name="T38", symb="0"))
+for k, v in enumerate(vocab.values(), 1): L.append(card("", symb=v, link="0" if k == len(vocab) else ""))
 C("WORD HEADS, ONE PER WORD: AN EMPTY DESCRIBABLE LIST (HEAD CELL, LINK 0) NAMED BY THE WORD SYMBOL. J11 FILLS IN THE DESCRIPTION LIST DURING TRAINING.")
 for w, v in vocab.items():
     L.append(card("HEAD OF " + w.upper(), name=v, symb="0", link="0"))
-if table:
-    C("VOCABULARY LIST T38, USED ONLY TO PRINT THE TABLE.")
-    L.append(card("VOCABULARY LIST", name="T38", symb="0"))
-    vs = list(vocab.values())
-    for k, t in enumerate(vs): L.append(card("", symb=t, link="0" if k == len(vs) - 1 else ""))
 C("THE TEXT, AS A LIST OF WORD SYMBOLS, HEAD T39: " + " ".join(words).upper())
 L.append(card("TEXT LIST", name="T39", symb="0"))
 for k, t in enumerate(text):

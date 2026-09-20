@@ -5,6 +5,31 @@ logged, traces under `traces/` at the repo root.
 
 ---
 
+## 2026-09-20 (later) -- `raven4.ipl` now prints WORDS (4-letter abbreviations), not `T###`
+
+Jeff's compromise: give each word a 4-letter abbreviation and print that.
+`mkdeck.py` derives abbreviations (first 4 letters, made unique by
+`first3+digit` on collision; recorded as `T# ABBR word` in `raven4.vocab`) and
+emits, per word, an alphanumeric data term `Vn` (PQ=21, up to 5 chars in the
+SYMB field). Symbols stay `Tn`; the program attaches each text term to its word
+as attribute `K1` (`J11`, phase 0, loop over parallel lists `T38` = words and
+`T37` = text terms). Output: `J10` (attribute `K1` of current word) then `J152`
+prints the term as one card, e.g. `V5   81   DREA`. `J16` ignores the
+`K1` attribute because it only weighs numeric values, so sampling is unaffected.
+
+**Probe first (`raven5a.ipl`):** `J152` on an alnum term prints `name 81 text`;
+retrievable through a description-list attribute with `J10`.
+
+**Result** (2 lines, 40 steps): ONCE UPON A MIDN DREA WHIL I POND WEAK AND WEAR
+OVER MANY A QUAI AND CURI VOLU OF FORG LORE ONCE UPON A MIDN DREA WHIL I POND
+WEAK AND WEAR OVER MANY A QUAI AND WEAR OVER MANY A.
+
+**Bugs hit while building (mine):** loop labels must be `9-<digits>`, so `9-A`
+silently did nothing; `alnum()` wrote only 2 chars of the name, so `V19`
+overwrote `V1` (start word printed `LORE`).
+
+---
+
 ## 2026-09-20 -- `raven4.ipl`: description-list bigram table with real counts (J10/J11/J16)
 
 **Design change.** Each word `Tn` is a *describable list* (empty head cell);
