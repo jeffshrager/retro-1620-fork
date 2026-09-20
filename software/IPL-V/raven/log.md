@@ -5,6 +5,30 @@ logged, traces under `traces/` at the repo root.
 
 ---
 
+## 2026-09-21 (later) -- full words instead of 4-letter abbreviations
+
+An alphanumeric data term holds only 5 chars, so each word is now a **list of
+pieces**: flag char + up to 4 letters (`+` first piece, `-` continuation), e.g.
+*pondered* = `+POND`, `-ERED`. `mkdeck.py` emits piece terms `V1..Vp`
+(region `V0`), one piece list `Yk` per word (region `Y0`), and `X3` = the piece
+lists in vocabulary order. Phase 0 now maps word `Tk` -> `Yk` on the `X4` map
+(same `J11` loop). New routine **`G4`** prints a word: it takes the piece list on
+the stack, walks it (`J60`/`J80`, cell in `W7`) and `J152`-prints each piece.
+The three inline `J10`+`J152` sequences (first word, `G1`, `G3` x2) became
+`J10` + `G4`. `decode.py` starts a word at each `+` piece and joins `-` pieces.
+Routine region `G0` grew to 6 (`G1`-`G4`). Non-letters are stripped from the
+printed text (`'tis` -> TIS).
+
+**Result** (12 lines, 100 steps, `L0`=900, default 40000 digits, 1078 cards): 0
+traps, clean halt, fits. Table rows like `I : PONDERED 1, NODDED 1, MUTTERED 1,
+REMEMBER 1, WISHED 1, HAD 1`; generated: *ONCE UPON A MIDNIGHT DREARY WHILE I
+MUTTERED TAPPING AT MY BOOKS SURCEASE OF SOME VISITER I HAD SOUGHT TO BORROW FROM
+MY CHAMBER DOOR ONLY THIS AND EACH SEPARATE DYING EMBER WROUGHT ITS GHOST UPON THE
+FLOOR EAGERLY I NODDED NEARLY NAPPING SUDDENLY THERE CAME A TAPPING AS OF FORGOTTEN
+LORE ...* (`raven4_decoded.txt`).
+
+---
+
 ## 2026-09-21 -- two stanzas, continuation table, and the "trap" was J16 (correction)
 
 **Scaled to 12 lines** (2 stanzas): 115 tokens, 83 distinct words, 100 generated
