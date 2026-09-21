@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Tokenize the first N lines of raven.txt and emit raven3.ipl (+ raven3.vocab).
-usage: mkdeck.py [nlines=12] [steps=100] [--lspace=900] [--no-table] [--no-comments] [--out=raven4.ipl]
+"""Tokenize the first N lines of raven.txt and emit raven_commented.ipl (+ raven.vocab).
+usage: mkdeck.py [nlines=12] [steps=100] [--lspace=900] [--no-table] [--no-comments] [--out=raven_commented.ipl]
 Words -> regional symbols T1..Tn (first-seen order); the text is a data list X1;
 each word gets an empty successor list named by its own symbol. The IPL-V
 program trains (appends each word to its predecessor's list) and generates.
@@ -28,7 +28,7 @@ def const(comment, name, value):            # integer data term, value right-jus
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 table = "--no-table" not in sys.argv
 nocomm = "--no-comments" in sys.argv        # omit the type-1 comment cards (faster loading)
-out = ([a.split("=")[1] for a in sys.argv if a.startswith("--out=")] or ["raven4.ipl"])[0]
+out = ([a.split("=")[1] for a in sys.argv if a.startswith("--out=")] or ["raven_commented.ipl"])[0]
 lspace = int(([a.split("=")[1] for a in sys.argv if a.startswith("--lspace=")] or ["900"])[0])
 nlines = int(args[0]) if len(args) > 0 else 12
 steps = int(args[1]) if len(args) > 1 else 100
@@ -46,7 +46,7 @@ for w in vocab:
     for c in ch:
         pterms.append(("V%d" % (len(pterms) + 1), c)); names.append(pterms[-1][0])
     wpieces[w] = names
-open("raven4.vocab", "w").write("\n".join("%s %s" % (v, w) for w, v in vocab.items()) + "\n")
+open("raven.vocab", "w").write("\n".join("%s %s" % (v, w) for w, v in vocab.items()) + "\n")
 
 def alnum(name, text):                       # alphanumeric data term: PQ=21, <=5 chars in the SYMB field
     s = [" "] * 80; s[48], s[49] = "2", "1"
