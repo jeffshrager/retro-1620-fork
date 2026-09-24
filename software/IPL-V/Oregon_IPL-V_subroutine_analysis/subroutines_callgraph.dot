@@ -265,6 +265,6 @@ digraph IPLV_J {
   // legend
   subgraph cluster_legend { label="Legend"; fontname="Helvetica"; style=dashed;
     L1 [label="loaded (IPL-V code in deck)", fillcolor="#cfe2f3"];
-    L2 [label="hard-coded; deck lists its dependencies", fillcolor="#cfe2f3", peripheries=2];
+    L2 [label="hard-coded; deck stub lists what loads with it", fillcolor="#cfe2f3", peripheries=2];
     L3 [label="hard-coded in interpreter", fillcolor="#dddddd"]; }
 }

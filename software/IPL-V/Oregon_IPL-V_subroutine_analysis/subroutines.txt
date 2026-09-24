@@ -1,7 +1,7 @@
 The standard IPL-V "J" subroutines: unpacking, description, call graph
 ======================================================================
 
-Files (all in software/IPL-V/)
+Files (all in software/IPL-V/Oregon_IPL-V_subroutine_analysis/)
   IPL-V-Subroutines.card       the original compressed library deck (OCR'd; JB->J8 fixed)
   subroutines.ipl              the same routines unpacked to standard IPL-V card format
   subroutines_j_functions.tsv  the J functions defined in that deck: name, description, calls
@@ -81,32 +81,46 @@ J100, J103, J134, J150, J170, J192. In the deck each is only a one-line entry:
   J66  J62 J64        J134  J130         J170  J10
   J100 DUMMY J17 / J18 J19               J192  J175
   J103 DUMMY J17 / J18 J19               J150  5 J151
-They are not second implementations. The interpreter source agrees with several of
-them: JJ66 carries the comment "USES J62 AND J64", JJ192 "USES J175", JJ134 branches to
-J130, J100/J103 are generator routines (J17-J19). Observed: J66 crashes through the
-Mod-3-4 machine code even though the deck defines J66, so the machine code is what
-runs. (The interpreter also has a comment "J148 IS IPL" by J147-J149; J148 is a
-normal loaded routine here, consistent with that.)
+They are not second implementations. They are LOAD-TIME DEPENDENCY entries for
+machine-code primitives that are loaded on demand. (Hypothesis from Jeff Shrager: the
+stubbed call-ins are big, so unless the user needs J192 or J175 they are not loaded.
+Confirmed by the experiment below.)
 
-Working hypothesis: the stubs are dependency/registration entries for machine-coded
-routines that call other J routines through their J cells (BT Jnn-5,...).
+How loading works (observed): Deck-2 holds the machine-code primitives as relocatable
+blocks. The loader fills a J cell (Q=5, SYMB=address of the code) only for primitives
+the program actually needs; every other J cell stays empty (all-zero). "Needs" is found
+by scanning the symbols used in the user program and, transitively, in any loaded
+IPL-coded library routine (so calling J16 pulls in J60, J110, J111, J116, J117, J118,
+J124, J129, J131 and the J2n/J3n/J4n/J5n chain it uses). A machine-code routine that
+calls other primitives internally cannot be scanned that way, so the deck's stub tells
+the loader what else must come with it.
 
-That hypothesis is only partly supported. A scan of the .sps finds 15 machine-coded
-routines that reference other J cells, and only 7 have a stub:
-  with stub    : J66 (J62,J64) J100,J103 (J18) J134 (J130) J150 (J151) J170 (J10)
-                 J192 (J175)
-  without stub : J81,J82,J83 (chain to J80/J81/J82)  J90 (J17,J19,J170)
-                 J110-J113 (J170)
-The scan only sees calls made through a J cell, so it undercounts. No rule was found
-that explains which routines got stubs. To settle it: read the loader's subroutine
-mode (SUBR/PD3 in the .sps) or run a test (e.g. delete the J192 stub from a copy of
-the compressed deck and see whether J192 still works). Neither was done. The
-graph legend ("hard-coded; deck lists its dependencies") states the hypothesis, not a
-verified fact.
+Experiment (program = one routine calling a single J then J8; snapshot of the J cells
+after the run, on the Mod-3-4 decks with the compressed subroutine deck):
+  always loaded (program using only J8): J0 J3 J4 J6 J7 J8 J9 J10 J20 J30 J40 J50
+      J64 J71 J90 J170
+  J192 -> adds J175 (stub J192 -> J175)     J66  -> adds J62 (J64 always loaded)
+  J100 -> adds J17 J18 J19                  J134 -> adds J130
+  J150 -> adds J151                         J170 -> adds nothing (J10 always loaded)
+  J60, J81, J83, J110 -> add only themselves
+  J16  -> J16, J21 J22 J31 J32 J41 J42 J52, J60 J110 J111 J116 J117 J118 J124 J129
+          J131 (the routines J16's deck code references)
+Every stub callee is either loaded only via the stub (J175, J62, J17-J19, J130, J151)
+or already always loaded (J64, J10), and the unstubbed routines that call others
+(J110-J113 -> J170) call ones that are always loaded. That explains why only some
+routines have stubs. Loose ends: J81-J83 appear to reference J80 (source scan) but J80
+is not loaded with J81, so that reference is not a real dependency or is handled
+differently; the earlier scan of the .sps for J-cell references also has false
+positives (e.g. J90 -> J17/J19, which are not loaded with J90). The J103 run trashed
+the J cells (the test program executes J103 on empty input), so its result is not
+usable, and J192's J200-J202 additions are likely run-time damage the same way.
+Sizes were not measured directly; from the load addresses the blocks are tens to a few
+hundred digits (J60 ~42, J175 ~194, J151 ~280), which matters on a 20,000-digit machine.
 
 6. Not in the repo
 ------------------
-The scripts used (the headless record-capture harness and the dot generator) live in
-a scratch area, not the repo. The record capture is a small wrapper around
-tools/cli/run1620.mjs's machinery that hooks the instruction at SWC2 and reads the IN1
-buffer; ask if you want it checked in.
+The scripts used (the headless record-capture harness, the J-cell snapshot harness for
+the experiment in section 5, and the dot generator) live in a scratch area, not the
+repo. Each is a small wrapper around tools/cli/run1620.mjs's machinery that hooks
+the processor and reads memory (the IN1 buffer at the SWC2 dispatch, or the J cells at
+end of run). Ask if you want them checked in.
