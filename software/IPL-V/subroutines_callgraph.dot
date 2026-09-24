@@ -1,7 +1,9 @@
 // Call graph of the standard IPL-V J subroutines in subroutines.ipl.
 // Edge A -> B: routine A has B in a SYMB or LINK field. Left = loaded routines
 // not called by any other routine here; right = J functions not defined in the
-// deck, i.e. hard coded in the interpreter. J2n/J3n/J4n/J5n/J8n/J9n are the
+// deck, i.e. hard coded in the interpreter. J66 J100 J103 J134 J150 J170 J192 are
+// hard-coded too; the deck only lists the routines they depend on, so they sit just
+// left of the hard-coded column. J2n/J3n/J4n/J5n/J8n/J9n are the
 // families of n-routines (J20-29, ..., J90-99; both loaded and hard-coded members).
 digraph IPLV_J {
   rankdir=LR; nodesep=0.15; ranksep=1.1; splines=true;
@@ -77,7 +79,34 @@ digraph IPLV_J {
   J193 [fillcolor="#dddddd"];
   J195 [fillcolor="#dddddd"];
   J197 [fillcolor="#dddddd"];
-  { rank=source; J5 J12 J13 J14 J15 J16 J66 J67 J69 J70 J73 J74 J76 J78 J102 J103 J134 J148 J150 J192; }
+  { rank=source; J5 J12 J13 J14 J15 J16 J67 J69 J70 J73 J74 J76 J78 J102 J148; }
+  // machine-coded routines that the deck only declares dependencies for: just left of the hard-coded column
+  { rank=same; J66 J100 J103 J134 J150 J170 J192; }
+  J5 -> J66 [style=invis];
+  J11 -> J66 [style=invis];
+  J12 -> J66 [style=invis];
+  J13 -> J66 [style=invis];
+  J14 -> J66 [style=invis];
+  J15 -> J66 [style=invis];
+  J16 -> J66 [style=invis];
+  J2n -> J66 [style=invis];
+  J3n -> J66 [style=invis];
+  J4n -> J66 [style=invis];
+  J5n -> J66 [style=invis];
+  J65 -> J66 [style=invis];
+  J67 -> J66 [style=invis];
+  J69 -> J66 [style=invis];
+  J70 -> J66 [style=invis];
+  J72 -> J66 [style=invis];
+  J73 -> J66 [style=invis];
+  J74 -> J66 [style=invis];
+  J76 -> J66 [style=invis];
+  J78 -> J66 [style=invis];
+  J8n -> J66 [style=invis];
+  J9n -> J66 [style=invis];
+  J101 -> J66 [style=invis];
+  J102 -> J66 [style=invis];
+  J148 -> J66 [style=invis];
   { rank=sink; J2 J3 J4 J6 J7 J8 J9 J10 J17 J18 J19 J60 J61 J62 J64 J68 J71 J75 J110 J111 J116 J117 J118 J121 J124 J129 J130 J131 J132 J133 J136 J137 J147 J151 J175 J193 J195 J197; }
   J5 -> J3;
   J5 -> J4;
@@ -236,6 +265,6 @@ digraph IPLV_J {
   // legend
   subgraph cluster_legend { label="Legend"; fontname="Helvetica"; style=dashed;
     L1 [label="loaded (IPL-V code in deck)", fillcolor="#cfe2f3"];
-    L2 [label="loaded AND also hard-coded", fillcolor="#cfe2f3", peripheries=2];
+    L2 [label="hard-coded; deck lists its dependencies", fillcolor="#cfe2f3", peripheries=2];
     L3 [label="hard-coded in interpreter", fillcolor="#dddddd"]; }
 }
