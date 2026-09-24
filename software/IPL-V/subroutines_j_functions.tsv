@@ -1,0 +1,32 @@
+J5	REVERSE H5. If H5 is +, set it -; if -, set it +.	J4, J3
+J11	ASSIGN (1) as the value of attribute (0) of list (2)'s description list (replaces any old value; creates the description list if none).	J52, J2, J90, J136, J60, J64, J32, J72, J170
+J12	ADD (1) at the front of the value list of attribute (0) of list (2).	J52, J10, J64, J32, J91, J136, J11
+J13	ADD (1) at the end of the value list of attribute (0) of list (2).	J52, J10, J65, J32, J91, J136, J11
+J14	ERASE attribute (0) of list (1): removes the attribute and its value from the description list.	J50, J60, J2, J132, J72, J68, J30
+J15	ERASE ALL attributes of list (0): erases its description list and empties the head.	J2, J72, J8
+J16	FIND ATTRIBUTE RANDOMLY from the description list of (0): pick an attribute with probability proportional to its positive numeric value; H5+ if one found.	J90, J124, J52, J60, J110, J8, J117, J129, J9, J116, J6, J111, J131, J118, J3, J71, J32
+J2n	MOVE (0)..(n) into W0..Wn, respectively (old contents of the W's are lost).	
+J3n	RESTORE W0..Wn.	
+J4n	PRESERVE W0..Wn.	
+J5n	PRESERVE W0..Wn, then MOVE (0)..(n) into them, respectively.	
+J65	INSERT (0) at the end of list (1).	J6, J61, J64
+J66	INSERT (0) on list (1) at the end, only if it is not already on it.	J62, J64
+J67	REPLACE (1) by (0) on list (2), first occurrence only; does nothing if (1) is not found.	J50, J62, J30
+J69	DELETE symbol (0) from list (1), first occurrence only; H5+ if found and deleted.	J62, J8, J68, J4
+J70	DELETE the last symbol from list (0); H5- if the list is empty.	J61, J8, J68, J4
+J72	ERASE LIST STRUCTURE (0): the list and all its locally named sublists (including description lists).	J101, J75, J9, J4
+J73	COPY LIST (0): new list with the same symbols in its cells (no sublists or description list copied).	J41, J132, J90, J136, J100, J31, J6, J64, J60
+J74	COPY LIST STRUCTURE (0): new structure isomorphic to (0), with new local names for sublists.	J132, J90, J136, J52, J71, J32, J6, J64, J60, J7, J10, J131, J11, J121
+J76	INSERT LIST (0) after cell (1): the cells of (0) are spliced in after cell (1) and (0)'s head is erased; outputs the last inserted cell.	J75, J6, J72, J60, J9, J8, J50, J193, J197, J61, J4, J30
+J78	TEST IF LIST (0) IS NOT EMPTY (H5- if its LINK is a termination symbol).	J60, J8
+J8n	FIND the symbol in list cell n of describable list (0); H5- if there is none. (J80 gives the head.)	
+J9n	CREATE a list of the n symbols (0)..(n-1): (n-1) first ... (0) last; output is the new list's name. (J90 creates an empty list.)	
+J100	GENERATE SYMBOLS from list (1) for subprocess (0): run the subprocess on each symbol of the list in order.	J17, J18, J19
+J101	GENERATE CELLS of list structure (1) for subprocess (0), in print order.	J17, J90, J22, J4, J60, J18, J80, J133, J131, J132, J137, J71, J9, J19
+J102	GENERATE CELLS of tree (1) for subprocess (0).	J17, J90, J4, J18, J132, J131, J60, J3, J68, J71, J19
+J103	GENERATE CELLS of block (1) for subprocess (0), in ascending order.	J17, J18, J19
+J134	TEST IF (0) IS AN INTERNAL SYMBOL (Q = 4).	J130
+J148	MARK ROUTINE (0) TO PROPAGATE TRACE (like J147, but with Q = 4).	J6, J147, J195
+J150	PRINT LIST STRUCTURE (0).	J151
+J170	TRAP ON (0): look up (0) on the error-trap description list W26 and run the routine associated with it.	J10
+J192	INPUT SYMB of cell (0) to H0 (regional if covered by a region control word, otherwise internal).	J175
