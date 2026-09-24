@@ -1,0 +1,112 @@
+The standard IPL-V "J" subroutines: unpacking, description, call graph
+======================================================================
+
+Files (all in software/IPL-V/)
+  IPL-V-Subroutines.card       the original compressed library deck (OCR'd; JB->J8 fixed)
+  subroutines.ipl              the same routines unpacked to standard IPL-V card format
+  subroutines_j_functions.tsv  the J functions defined in that deck: name, description, calls
+  subroutines_callgraph.dot    Graphviz call graph of those routines (dot -Tpdf ...)
+  subroutines_callgraph.pdf    rendered call graph
+
+1. What the deck is
+-------------------
+IPL-V-Subroutines.card is a "compressed" deck: each card packs many IPL words
+(PQ+SYMB, optional NAME and LINK) into a free-form stream, with a sequence number in
+cols 73-80. The interpreter's loader expands it (routine COMPR in the .sps) into
+standard 80-column records before processing. The deck starts with a header card
+("SYSTEM SUBROUTINE HEADER CARD", type 5) that puts the loader into that mode. It
+holds 77 named J routines.
+
+2. How it was unpacked (subroutines.ipl)
+----------------------------------------
+Guessing the packing from the OCR spacing does not work: the spacing is unreliable
+and items like "70  9-1" are a PQ with a LINK, not two words. Instead the Mod-3-4
+loader was run in a headless harness (built on tools/cli) and the standard-format
+record image was captured each time the loader reached SWC2, its card-type dispatch.
+That gives exactly the records the loader itself builds: NAME cols 43-47, PQ 49-50,
+SYMB 51-55, LINK 57-61, TYPE col 41.
+
+What subroutines.ipl contains: 10 comment cards; a "5 01" data header; the data terms
+W10, W20, W26, W31, W32 (W10 looks like the J129 random seed, +7245906183); a "5 00"
+routine header; then all the routines. The compressed-deck header cards were
+omitted, since they are not normal IPL.
+
+STATUS: UNTESTED as a standalone deck. One test load (spliced into raven.ipl before its
+"5 A0" start card, in place of the compressed deck) check-stopped with "invalid op
+code 40 @03058". The original compressed deck works. Likely causes: the two header
+cards, which I wrote and the original does not use, or the loader's system-subroutine
+mode, which is what lets a deck define names like J12 in the J region. Not resolved.
+A few expanded cards look odd (e.g. "J98 ... 300", "J148 1000004"); they are copied as
+the loader produced them and were not checked against the routines' behavior.
+
+3. The TSV (subroutines_j_functions.tsv)
+----------------------------------------
+Columns: J name, short description, J functions it calls.
+  * Names are those in the NAME column of subroutines.ipl, one per row.
+  * Descriptions are paraphrased from the manual's process definitions (Part Two,
+    sections 5-24; IPL_manual.txt). The manual's OCR is garbled in places; titles were
+    repaired from context. J13's definition was cut off; it was inferred (J12 with
+    "at end", and the deck calls J65).
+  * The n-families are collapsed to one row each: J2n (move to W0..Wn), J3n (restore),
+    J4n (preserve), J5n (preserve then move), J8n (find nth symbol), J9n (create list of
+    n symbols). Each family row covers every n in its range; the deck defines
+    J21-J59, J84-J89 and J91-J99, and J20/J30/J40/J50, J80-J83, J90 are hard-coded.
+  * "Calls": every J<n> appearing in a routine's SYMB or LINK fields (from its NAME
+    card to the next J-named card), first occurrence order, without duplicates, not
+    counting itself. It includes control-flow uses (e.g. J8 as an exit). Calls into a
+    family appear as the specific routine used (J52, J32, ...). J74 calls J7 (HALT); not
+    checked whether that is real or an OCR slip. J100 and J103 are each defined by two
+    consecutive card groups, which were merged.
+
+4. The call graph (subroutines_callgraph.dot / .pdf)
+----------------------------------------------------
+Nodes are the routines in the deck plus every J they call that is not defined there.
+Edge A -> B: A has B in a SYMB or LINK field. The n-families are single nodes and
+calls within a family are dropped. Drawn left to right:
+  * far left  : loaded routines that no other routine here calls (top level);
+  * middle    : the other loaded routines;
+  * just off the right edge (double border): J66, J100, J103, J134, J150, J170, J192,
+    see section 5;
+  * far right (gray): J functions the deck does not define, i.e. hard-coded in the
+    interpreter (each has a JJ<n> label in IPL-V-Interpreter-Mod-3-4.sps).
+70 nodes, 154 edges. It is meant to show the shape (which routines are complex, how
+much they lean on the hard-coded layer), not to be traced edge by edge. The
+"hard-coded" set is "called but not defined in the deck" and was cross-checked
+against the JJ labels in the .sps: every such J has one.
+
+5. The stubs: routines both in the deck and hard-coded
+-----------------------------------------------------
+Seven names are defined in the deck AND have machine code in the interpreter: J66,
+J100, J103, J134, J150, J170, J192. In the deck each is only a one-line entry:
+  J66  J62 J64        J134  J130         J170  J10
+  J100 DUMMY J17 / J18 J19               J192  J175
+  J103 DUMMY J17 / J18 J19               J150  5 J151
+They are not second implementations. The interpreter source agrees with several of
+them: JJ66 carries the comment "USES J62 AND J64", JJ192 "USES J175", JJ134 branches to
+J130, J100/J103 are generator routines (J17-J19). Observed: J66 crashes through the
+Mod-3-4 machine code even though the deck defines J66, so the machine code is what
+runs. (The interpreter also has a comment "J148 IS IPL" by J147-J149; J148 is a
+normal loaded routine here, consistent with that.)
+
+Working hypothesis: the stubs are dependency/registration entries for machine-coded
+routines that call other J routines through their J cells (BT Jnn-5,...).
+
+That hypothesis is only partly supported. A scan of the .sps finds 15 machine-coded
+routines that reference other J cells, and only 7 have a stub:
+  with stub    : J66 (J62,J64) J100,J103 (J18) J134 (J130) J150 (J151) J170 (J10)
+                 J192 (J175)
+  without stub : J81,J82,J83 (chain to J80/J81/J82)  J90 (J17,J19,J170)
+                 J110-J113 (J170)
+The scan only sees calls made through a J cell, so it undercounts. No rule was found
+that explains which routines got stubs. To settle it: read the loader's subroutine
+mode (SUBR/PD3 in the .sps) or run a test (e.g. delete the J192 stub from a copy of
+the compressed deck and see whether J192 still works). Neither was done. The
+graph legend ("hard-coded; deck lists its dependencies") states the hypothesis, not a
+verified fact.
+
+6. Not in the repo
+------------------
+The scripts used (the headless record-capture harness and the dot generator) live in
+a scratch area, not the repo. The record capture is a small wrapper around
+tools/cli/run1620.mjs's machinery that hooks the instruction at SWC2 and reads the IN1
+buffer; ask if you want it checked in.
